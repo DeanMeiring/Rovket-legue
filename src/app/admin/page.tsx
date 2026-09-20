@@ -12,6 +12,7 @@ type UserRow = {
   role: string;
   status: string;
   rlTrackerUrl: string | null;
+  skillRating: number | null;
   teamId: string | null;
   team: { id: string; name: string } | null;
 };
@@ -73,11 +74,16 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-10 max-w-4xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-3xl font-bold">Admin panel</h1>
-        <Link href="/events/new" className="btn-primary">
-          + New event
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/balance-teams" className="btn-secondary">
+            ⚖️ Balance tryout teams
+          </Link>
+          <Link href="/events/new" className="btn-primary">
+            + New event
+          </Link>
+        </div>
       </div>
 
       {loading && <p className="text-slate-500">Loading...</p>}
@@ -168,8 +174,28 @@ export default function AdminPage() {
                   {u.role === "ADMIN" && <span className="badge bg-accent2/20 text-accent2 ml-1">Admin</span>}
                 </p>
                 <p className="text-xs text-slate-500">@{u.username} · {u.email}</p>
+                {u.rlTrackerUrl && (
+                  <a href={u.rlTrackerUrl} target="_blank" rel="noreferrer" className="text-xs text-accent2 hover:underline">
+                    RL Tracker profile
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1" title="Skill rating (MMR from their RL Tracker page) — used by the team balancer">
+                  <span className="text-xs text-slate-500">MMR</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={3000}
+                    className="input !py-1 !w-20 text-sm"
+                    defaultValue={u.skillRating ?? ""}
+                    placeholder="—"
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      updateUser(u.id, { skillRating: val === "" ? null : Number(val) });
+                    }}
+                  />
+                </div>
                 <select
                   className="input !py-1 !w-auto text-sm"
                   value={u.teamId || ""}

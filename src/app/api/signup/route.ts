@@ -8,9 +8,11 @@ const schema = z.object({
   username: z
     .string()
     .trim()
-    .min(3)
-    .max(32)
-    .regex(/^[a-zA-Z0-9_.-]+$/, "Username can only contain letters, numbers, . _ -"),
+    .min(2, "Username must be at least 2 characters")
+    .max(40, "Username must be 40 characters or fewer")
+    // In-game names (Epic, PSN, Xbox, Steam) often include spaces, accents,
+    // brackets, or other symbols — only block control characters.
+    .regex(/^[^\x00-\x1F\x7F]+$/, "Username contains invalid characters"),
   email: z.string().trim().email(),
   password: z.string().min(8).max(200),
   displayName: z.string().trim().min(1).max(80),

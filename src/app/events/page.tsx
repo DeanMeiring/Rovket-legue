@@ -133,6 +133,9 @@ export default function EventsPage() {
                       <Link href={`/events/${ev.id}`} className="text-xs text-accent2 hover:underline">
                         Manage
                       </Link>
+                      <Link href={`/events/${ev.id}/edit`} className="text-xs text-accent2 hover:underline">
+                        Edit
+                      </Link>
                       <button
                         onClick={() => removeEvent(ev.id)}
                         className="text-xs text-red-400 hover:underline"

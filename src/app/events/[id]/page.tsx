@@ -116,9 +116,14 @@ export default function EventDetailPage() {
             </p>
           </div>
           {isAdmin && (
-            <button onClick={deleteEvent} className="btn-danger">
-              Delete event
-            </button>
+            <div className="flex gap-2">
+              <Link href={`/events/${event.id}/edit`} className="btn-secondary">
+                Edit event
+              </Link>
+              <button onClick={deleteEvent} className="btn-danger">
+                Delete event
+              </button>
+            </div>
           )}
         </div>
         {event.description && <p className="text-slate-300 mt-4">{event.description}</p>}

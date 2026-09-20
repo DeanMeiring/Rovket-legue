@@ -9,6 +9,7 @@ const schema = z.object({
   role: z.enum(["ADMIN", "PLAYER"]).optional(),
   teamId: z.string().nullable().optional(),
   rlTrackerUrl: z.string().trim().optional().nullable(),
+  skillRating: z.number().int().min(0).max(3000).nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
