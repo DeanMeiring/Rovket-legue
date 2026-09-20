@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, RSVP_COLOR, RSVP_LABEL } from "@/lib/format";
+import LinkTrackerModal from "@/components/LinkTrackerModal";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -58,6 +59,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <LinkTrackerModal initialOpen={user.role === "PLAYER" && !dbUser?.rlTrackerUrl} />
+
       <div>
         <h1 className="text-3xl font-bold">Welcome back, {dbUser?.displayName || user.username} 👋</h1>
         <p className="text-slate-400 mt-1">

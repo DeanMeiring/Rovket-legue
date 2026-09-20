@@ -10,7 +10,7 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "node --env-file=.env ./node_modules/.bin/tsx prisma/seed.ts",
     "db:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
