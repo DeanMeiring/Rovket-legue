@@ -33,3 +33,9 @@ export function rankLabelForValue(value: number | null | undefined): string | nu
   }
   return closest.label;
 }
+
+export const PLAYLISTS: { key: "rank1v1" | "rank2v2" | "rank3v3"; label: string }[] = [
+  { key: "rank1v1", label: "1v1 (Duel)" },
+  { key: "rank2v2", label: "2v2 (Doubles)" },
+  { key: "rank3v3", label: "3v3 (Standard)" },
+];

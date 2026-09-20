@@ -4,20 +4,26 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { balanceIntoTeams } from "@/lib/teamBalance";
+import { PLAYLISTS } from "@/lib/ranks";
 
 type PlayerRow = {
   id: string;
   username: string;
   displayName: string | null;
   status: string;
-  skillRating: number | null;
+  rank1v1: number | null;
+  rank2v2: number | null;
+  rank3v3: number | null;
   teamId: string | null;
 };
+
+type RankKey = "rank1v1" | "rank2v2" | "rank3v3";
 
 export default function BalanceTeamsPage() {
   const router = useRouter();
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [format, setFormat] = useState<RankKey>("rank3v3");
   const [teamCount, setTeamCount] = useState(2);
   const [namePrefix, setNamePrefix] = useState("Team");
   const [groups, setGroups] = useState<PlayerRow[][] | null>(null);
@@ -40,7 +46,7 @@ export default function BalanceTeamsPage() {
   }, []);
 
   const selectedPlayers = players.filter((p) => selected[p.id]);
-  const missingRatingCount = selectedPlayers.filter((p) => p.skillRating == null).length;
+  const missingRatingCount = selectedPlayers.filter((p) => p[format] == null).length;
 
   function toggle(id: string) {
     setSelected((s) => ({ ...s, [id]: !s[id] }));
@@ -48,7 +54,8 @@ export default function BalanceTeamsPage() {
   }
 
   function suggest() {
-    setGroups(balanceIntoTeams(selectedPlayers, teamCount));
+    const withSkill = selectedPlayers.map((p) => ({ ...p, skillRating: p[format] }));
+    setGroups(balanceIntoTeams(withSkill, teamCount));
   }
 
   async function createTeams() {
@@ -81,15 +88,32 @@ export default function BalanceTeamsPage() {
         </Link>
         <h1 className="text-3xl font-bold mt-2">Balance tryout teams</h1>
         <p className="text-slate-400 mt-1">
-          Pick who&apos;s in the pool and how many teams you need — this splits them as
-          evenly as possible by skill rating (set each player&apos;s MMR from their RL
-          Tracker page in the admin panel first). Players with no rating are treated as
-          average.
+          Pick the match format, who&apos;s in the pool, and how many teams you need —
+          this splits them as evenly as possible by rank in that playlist (players
+          self-report ranks, or set one per player in the admin panel). Players with no
+          rating for the chosen format are treated as average.
         </p>
       </div>
 
       <div className="card space-y-4">
         <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="label">Match format</label>
+            <select
+              className="input !w-40"
+              value={format}
+              onChange={(e) => {
+                setFormat(e.target.value as RankKey);
+                setGroups(null);
+              }}
+            >
+              {PLAYLISTS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="label">Number of teams</label>
             <input
@@ -127,8 +151,9 @@ export default function BalanceTeamsPage() {
         )}
         {missingRatingCount > 0 && selectedPlayers.length > 0 && (
           <p className="text-sm text-slate-500">
-            {missingRatingCount} of {selectedPlayers.length} selected player(s) have no
-            skill rating set — they&apos;ll be treated as average skill.
+            {missingRatingCount} of {selectedPlayers.length} selected player(s) have no{" "}
+            {PLAYLISTS.find((p) => p.key === format)?.label} rank set — they&apos;ll be
+            treated as average skill.
           </p>
         )}
       </div>
@@ -147,7 +172,7 @@ export default function BalanceTeamsPage() {
                 {p.displayName || p.username}
               </label>
               <span className="text-slate-500">
-                {p.skillRating != null ? `${p.skillRating} MMR` : "no rating"}
+                {p[format] != null ? p[format] : "no rating"}
                 {p.teamId && " · already on a team"}
               </span>
             </li>
@@ -168,21 +193,21 @@ export default function BalanceTeamsPage() {
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {groups.map((g, i) => {
-              const known = g.map((p) => p.skillRating).filter((r): r is number => r != null);
+              const known = g.map((p) => p[format]).filter((r): r is number => r != null);
               const avg = known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
               return (
                 <div key={i} className="border border-border rounded-lg p-3">
                   <p className="font-semibold mb-2">
                     {namePrefix} {i + 1}{" "}
                     <span className="text-slate-500 font-normal">
-                      · avg {avg != null ? `${avg} MMR` : "no data"}
+                      · avg {avg != null ? avg : "no data"}
                     </span>
                   </p>
                   <ul className="space-y-1 text-sm text-slate-300">
                     {g.map((p) => (
                       <li key={p.id} className="flex justify-between">
                         <span>{p.displayName || p.username}</span>
-                        <span className="text-slate-500">{p.skillRating ?? "—"}</span>
+                        <span className="text-slate-500">{p[format] ?? "—"}</span>
                       </li>
                     ))}
                   </ul>

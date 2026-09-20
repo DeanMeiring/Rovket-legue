@@ -13,10 +13,18 @@ type UserRow = {
   role: string;
   status: string;
   rlTrackerUrl: string | null;
-  skillRating: number | null;
+  rank1v1: number | null;
+  rank2v2: number | null;
+  rank3v3: number | null;
   teamId: string | null;
   team: { id: string; name: string } | null;
 };
+
+const RANK_FIELDS = [
+  { key: "rank1v1" as const, label: "1s" },
+  { key: "rank2v2" as const, label: "2s" },
+  { key: "rank3v3" as const, label: "3s" },
+];
 
 export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -182,25 +190,28 @@ export default function AdminPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div
-                  className="flex items-center gap-1"
-                  title="Skill rating — self-reported rank, or a real MMR you look up from their RL Tracker page. Used by the team balancer."
-                >
-                  <span className="text-xs text-slate-500">
-                    {rankLabelForValue(u.skillRating) || "Skill"}
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={3000}
-                    className="input !py-1 !w-20 text-sm"
-                    defaultValue={u.skillRating ?? ""}
-                    placeholder="—"
-                    onBlur={(e) => {
-                      const val = e.target.value.trim();
-                      updateUser(u.id, { skillRating: val === "" ? null : Number(val) });
-                    }}
-                  />
+                <div className="flex items-center gap-1">
+                  {RANK_FIELDS.map((f) => (
+                    <div
+                      key={f.key}
+                      className="flex flex-col items-center"
+                      title={rankLabelForValue(u[f.key]) || "No rank set — used by the team balancer"}
+                    >
+                      <span className="text-[10px] text-slate-500">{f.label}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={3000}
+                        className="input !py-1 !px-1 !w-16 text-sm text-center"
+                        defaultValue={u[f.key] ?? ""}
+                        placeholder="—"
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          updateUser(u.id, { [f.key]: val === "" ? null : Number(val) });
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
                 <select
                   className="input !py-1 !w-auto text-sm"

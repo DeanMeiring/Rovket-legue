@@ -19,11 +19,24 @@ const schema = z.object({
   displayName: z.string().trim().min(1).max(80),
   rlTrackerUrl: z.string().trim().url().optional().or(z.literal("")),
   platform: z.string().trim().max(40).optional().or(z.literal("")),
-  rank: z
+  rank1v1: z
+    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
+    .optional()
+    .or(z.literal("")),
+  rank2v2: z
+    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
+    .optional()
+    .or(z.literal("")),
+  rank3v3: z
     .enum(RANKS.map((r) => r.label) as [string, ...string[]])
     .optional()
     .or(z.literal("")),
 });
+
+function rankValue(label: string | undefined): number | null {
+  if (!label) return null;
+  return RANKS.find((r) => r.label === label)?.value ?? null;
+}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -36,10 +49,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const { username, email, password, displayName, rlTrackerUrl, platform, rank } = parsed.data;
+  const { username, email, password, displayName, rlTrackerUrl, platform, rank1v1, rank2v2, rank3v3 } =
+    parsed.data;
   const normalizedUsername = username.toLowerCase();
   const normalizedEmail = email.toLowerCase();
-  const skillRating = rank ? RANKS.find((r) => r.label === rank)?.value ?? null : null;
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ username: normalizedUsername }, { email: normalizedEmail }] },
@@ -61,7 +74,9 @@ export async function POST(req: Request) {
       displayName,
       rlTrackerUrl: rlTrackerUrl || null,
       platform: platform || null,
-      skillRating,
+      rank1v1: rankValue(rank1v1),
+      rank2v2: rankValue(rank2v2),
+      rank3v3: rankValue(rank3v3),
       role: "PLAYER",
       status: "PENDING",
     },

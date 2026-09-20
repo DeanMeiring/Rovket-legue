@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { RANKS, rankLabelForValue } from "@/lib/ranks";
+import { PLAYLISTS, rankLabelForValue } from "@/lib/ranks";
+import RankPicker from "@/components/RankPicker";
 
 type Performance = {
   id: string;
@@ -29,7 +30,9 @@ type Player = {
   discordTag: string | null;
   bio: string | null;
   role: string;
-  skillRating: number | null;
+  rank1v1: number | null;
+  rank2v2: number | null;
+  rank3v3: number | null;
   team: { id: string; name: string } | null;
   performances: Performance[];
 };
@@ -46,7 +49,9 @@ export default function PlayerProfilePage() {
     platform: "",
     discordTag: "",
     bio: "",
-    rank: "",
+    rank1v1: "",
+    rank2v2: "",
+    rank3v3: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -64,7 +69,9 @@ export default function PlayerProfilePage() {
         platform: data.platform || "",
         discordTag: data.discordTag || "",
         bio: data.bio || "",
-        rank: rankLabelForValue(data.skillRating) || "",
+        rank1v1: rankLabelForValue(data.rank1v1) || "",
+        rank2v2: rankLabelForValue(data.rank2v2) || "",
+        rank3v3: rankLabelForValue(data.rank3v3) || "",
       });
     }
     setLoading(false);
@@ -138,8 +145,13 @@ export default function PlayerProfilePage() {
             )}
             {player.platform && <p>🎮 Platform: {player.platform}</p>}
             {player.discordTag && <p>💬 Discord: {player.discordTag}</p>}
-            {rankLabelForValue(player.skillRating) && (
-              <p>🏅 Rank: {rankLabelForValue(player.skillRating)}</p>
+            {(player.rank1v1 || player.rank2v2 || player.rank3v3) && (
+              <p>
+                🏅 Ranks:{" "}
+                {PLAYLISTS.filter((p) => player[p.key] != null)
+                  .map((p) => `${p.label.split(" ")[0]} ${rankLabelForValue(player[p.key])}`)
+                  .join(" · ")}
+              </p>
             )}
             {player.bio && <p className="text-slate-300 mt-3">{player.bio}</p>}
           </div>
@@ -188,19 +200,11 @@ export default function PlayerProfilePage() {
               />
             </div>
             <div>
-              <label className="label">Current rank</label>
-              <select
-                className="input"
-                value={form.rank}
-                onChange={(e) => setForm({ ...form, rank: e.target.value })}
-              >
-                <option value="">Not sure / unranked</option>
-                {RANKS.map((r) => (
-                  <option key={r.label} value={r.label}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+              <label className="label">Current ranks</label>
+              <RankPicker
+                value={{ rank1v1: form.rank1v1, rank2v2: form.rank2v2, rank3v3: form.rank3v3 }}
+                onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+              />
             </div>
             <button type="submit" disabled={saving} className="btn-primary">
               {saving ? "Saving..." : "Save changes"}

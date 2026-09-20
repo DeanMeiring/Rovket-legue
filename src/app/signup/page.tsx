@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { RANKS } from "@/lib/ranks";
+import RankPicker from "@/components/RankPicker";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -14,7 +14,9 @@ export default function SignupPage() {
     displayName: "",
     rlTrackerUrl: "",
     platform: "",
-    rank: "",
+    rank1v1: "",
+    rank2v2: "",
+    rank3v3: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -119,21 +121,14 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="label">Current rank (optional)</label>
-            <select
-              className="input"
-              value={form.rank}
-              onChange={(e) => update("rank", e.target.value)}
-            >
-              <option value="">Not sure / unranked</option>
-              {RANKS.map((r) => (
-                <option key={r.label} value={r.label}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+            <label className="label">Current ranks (optional)</label>
+            <RankPicker
+              value={{ rank1v1: form.rank1v1, rank2v2: form.rank2v2, rank3v3: form.rank3v3 }}
+              onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+            />
             <p className="text-xs text-slate-500 mt-1">
-              Helps admins balance tryout teams. Doesn&apos;t need to be exact.
+              Fill in whichever playlists you play — helps admins balance tryout teams.
+              Doesn&apos;t need to be exact.
             </p>
           </div>
           <div>
