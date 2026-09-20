@@ -34,8 +34,8 @@ cp .env.example .env
 # edit .env: set DATABASE_URL to your local Postgres, and ADMIN_* for the first admin
 
 npm install
-npm run db:push     # create tables from prisma/schema.prisma
-npm run db:seed     # create the first admin user from ADMIN_* env vars
+npx prisma migrate dev   # create tables from prisma/migrations
+npm run db:seed          # create the first admin user from ADMIN_* env vars
 npm run dev
 ```
 
@@ -58,16 +58,24 @@ it off.
 
 ## Deploying on Railway
 
-1. Create a Railway project, add a **PostgreSQL** plugin, and a service pointing at
-   this repo/branch.
-2. Set the service's `DATABASE_URL` to the Postgres plugin's connection string
-   (Railway does this automatically if they're in the same project).
+This repo is already wired up to deploy as a Railway project (`rocket-league-team-hub`)
+with a Postgres database and a `web` service tracking this branch. To set one up from
+scratch, or to understand what's already there:
+
+1. Create a Railway project, deploy the **Postgres** template into it, and add a
+   service pointing at this repo/branch.
+2. Set the service's `DATABASE_URL` to `${{Postgres.DATABASE_URL}}` (a Railway
+   variable reference — resolves automatically since both services are in the same
+   project).
 3. Set `NEXTAUTH_SECRET` (generate with `openssl rand -base64 32`), `NEXTAUTH_URL`
    (your Railway domain), `ADMIN_USERNAME`/`ADMIN_EMAIL`/`ADMIN_PASSWORD`, and the
-   `SMTP_*` / `EMAIL_FROM` vars.
-4. Build command: `npm run build`. Start command: `npm run start`.
-5. After the first deploy, run `npm run db:push` and `npm run db:seed` once (Railway's
-   one-off command runner, or `railway run`) to create the schema and the first admin.
+   `SMTP_*` / `EMAIL_FROM` vars once you have an email provider.
+4. Build command: `npm run build` (default). Start command: `npm run start:release` —
+   this runs `prisma migrate deploy` (applies the schema) and the admin-seed script
+   before starting the server, so both happen automatically on every deploy. The seed
+   script no-ops once the admin user already exists.
+5. Generate a public domain for the service and set `NEXTAUTH_URL` to it (must be set
+   before the first real login attempt, since NextAuth uses it for callback URLs).
 
 ## Project structure
 
