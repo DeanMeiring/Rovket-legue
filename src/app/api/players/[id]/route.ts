@@ -17,6 +17,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       discordTag: true,
       bio: true,
       role: true,
+      skillRating: true,
       team: { select: { id: true, name: true, colorHex: true } },
       performances: {
         orderBy: { createdAt: "desc" },

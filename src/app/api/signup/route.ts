@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { RANKS } from "@/lib/ranks";
 
 const schema = z.object({
   username: z
@@ -18,6 +19,10 @@ const schema = z.object({
   displayName: z.string().trim().min(1).max(80),
   rlTrackerUrl: z.string().trim().url().optional().or(z.literal("")),
   platform: z.string().trim().max(40).optional().or(z.literal("")),
+  rank: z
+    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
+    .optional()
+    .or(z.literal("")),
 });
 
 export async function POST(req: Request) {
@@ -31,9 +36,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const { username, email, password, displayName, rlTrackerUrl, platform } = parsed.data;
+  const { username, email, password, displayName, rlTrackerUrl, platform, rank } = parsed.data;
   const normalizedUsername = username.toLowerCase();
   const normalizedEmail = email.toLowerCase();
+  const skillRating = rank ? RANKS.find((r) => r.label === rank)?.value ?? null : null;
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ username: normalizedUsername }, { email: normalizedEmail }] },
@@ -55,6 +61,7 @@ export async function POST(req: Request) {
       displayName,
       rlTrackerUrl: rlTrackerUrl || null,
       platform: platform || null,
+      skillRating,
       role: "PLAYER",
       status: "PENDING",
     },

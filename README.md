@@ -12,9 +12,15 @@ A team management site for tryouts, rosters, events, and performance tracking.
   RSVP (Going / Maybe / Declined). Everyone gets an email when an event is created, and
   another reminder a few hours before it starts.
 - **Performance tracking.** Admins log goals, assists, saves, shots, score, MVP, and
-  win/loss per player per event. Every player has a profile with career totals and full
-  history; there's also a personal "My Performance" page.
+  win/loss per player per event — either by hand, or by pasting a ballchasing.com replay
+  link (see below) to auto-fill stats for every matched player. Every player has a
+  profile with career totals and full history; there's also a personal "My Performance"
+  page.
 - **Roster.** Players grouped by team, with links to Rocket League Tracker profiles.
+- **Tryout team balancing.** Players self-report their current rank at signup (or update
+  it later on their profile); admins can also set/override a raw skill number per player.
+  The admin panel's "Balance tryout teams" tool then snake-drafts a selected pool of
+  players into N teams as evenly matched as possible, and creates the teams in one click.
 
 Messaging is email-only for now (see [`docs/messaging-notes.md`](./docs/messaging-notes.md)
 for why, and how to add Telegram later if you want it).
@@ -55,6 +61,26 @@ them, so local development works without any email setup.
 goes out. The scheduler runs inside the app itself via `instrumentation.ts` (checks
 every 15 minutes) — no external cron needed. Set `DISABLE_REMINDER_CRON=true` to turn
 it off.
+
+## Importing match stats from ballchasing.com
+
+There's no reliable, free way to look up a player's current rank/MMR by username — so
+tryout balancing relies on players self-reporting their rank (or an admin setting a raw
+number, e.g. from eyeballing their RL Tracker page). Match *performance* stats are a
+different story: after a match, upload the replay to
+[ballchasing.com](https://ballchasing.com) (free, works with any replay file), then paste
+the resulting replay link into that event's page in the admin panel. The app fetches the
+parsed replay via ballchasing's API and creates a Performance row for every player whose
+in-game name matches an app username or display name — anyone it can't match is listed so
+you can log them by hand.
+
+To enable it, set `BALLCHASING_API_KEY`:
+1. Log in to https://ballchasing.com/upload with Steam (free).
+2. Get your API token from https://ballchasing.com/doc/api (shown at the top once logged in).
+3. Set it as `BALLCHASING_API_KEY` in your environment (or Railway variables).
+
+Free-tier rate limits are generous for occasional imports (1000 replay fetches/hour) —
+plenty for pulling stats after scrims and tryouts.
 
 ## Deploying on Railway
 

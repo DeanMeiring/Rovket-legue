@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import Link from "next/link";
+import { RANKS, rankLabelForValue } from "@/lib/ranks";
 
 type Performance = {
   id: string;
@@ -28,6 +29,7 @@ type Player = {
   discordTag: string | null;
   bio: string | null;
   role: string;
+  skillRating: number | null;
   team: { id: string; name: string } | null;
   performances: Performance[];
 };
@@ -38,7 +40,14 @@ export default function PlayerProfilePage() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ displayName: "", rlTrackerUrl: "", platform: "", discordTag: "", bio: "" });
+  const [form, setForm] = useState({
+    displayName: "",
+    rlTrackerUrl: "",
+    platform: "",
+    discordTag: "",
+    bio: "",
+    rank: "",
+  });
   const [saving, setSaving] = useState(false);
 
   const isSelf = session?.user.id === params.id;
@@ -55,6 +64,7 @@ export default function PlayerProfilePage() {
         platform: data.platform || "",
         discordTag: data.discordTag || "",
         bio: data.bio || "",
+        rank: rankLabelForValue(data.skillRating) || "",
       });
     }
     setLoading(false);
@@ -128,6 +138,9 @@ export default function PlayerProfilePage() {
             )}
             {player.platform && <p>🎮 Platform: {player.platform}</p>}
             {player.discordTag && <p>💬 Discord: {player.discordTag}</p>}
+            {rankLabelForValue(player.skillRating) && (
+              <p>🏅 Rank: {rankLabelForValue(player.skillRating)}</p>
+            )}
             {player.bio && <p className="text-slate-300 mt-3">{player.bio}</p>}
           </div>
         ) : (
@@ -173,6 +186,21 @@ export default function PlayerProfilePage() {
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
               />
+            </div>
+            <div>
+              <label className="label">Current rank</label>
+              <select
+                className="input"
+                value={form.rank}
+                onChange={(e) => setForm({ ...form, rank: e.target.value })}
+              >
+                <option value="">Not sure / unranked</option>
+                {RANKS.map((r) => (
+                  <option key={r.label} value={r.label}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <button type="submit" disabled={saving} className="btn-primary">
               {saving ? "Saving..." : "Save changes"}

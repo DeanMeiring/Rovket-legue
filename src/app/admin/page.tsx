@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { rankLabelForValue } from "@/lib/ranks";
 
 type Team = { id: string; name: string; colorHex: string | null; members: { id: string }[] };
 type UserRow = {
@@ -181,8 +182,13 @@ export default function AdminPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1" title="Skill rating (MMR from their RL Tracker page) — used by the team balancer">
-                  <span className="text-xs text-slate-500">MMR</span>
+                <div
+                  className="flex items-center gap-1"
+                  title="Skill rating — self-reported rank, or a real MMR you look up from their RL Tracker page. Used by the team balancer."
+                >
+                  <span className="text-xs text-slate-500">
+                    {rankLabelForValue(u.skillRating) || "Skill"}
+                  </span>
                   <input
                     type="number"
                     min={0}

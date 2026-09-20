@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApprovedUser } from "@/lib/session";
+import { RANKS } from "@/lib/ranks";
 
 const schema = z.object({
   displayName: z.string().trim().min(1).max(80).optional(),
@@ -9,6 +10,10 @@ const schema = z.object({
   platform: z.string().trim().max(40).optional().or(z.literal("")),
   discordTag: z.string().trim().max(60).optional().or(z.literal("")),
   bio: z.string().trim().max(500).optional().or(z.literal("")),
+  rank: z
+    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
+    .optional()
+    .or(z.literal("")),
 });
 
 export async function PATCH(req: Request) {
@@ -25,6 +30,13 @@ export async function PATCH(req: Request) {
   }
 
   const data = parsed.data;
+  const skillRating =
+    data.rank !== undefined
+      ? data.rank
+        ? RANKS.find((r) => r.label === data.rank)?.value ?? null
+        : null
+      : undefined;
+
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -33,6 +45,7 @@ export async function PATCH(req: Request) {
       ...(data.platform !== undefined && { platform: data.platform || null }),
       ...(data.discordTag !== undefined && { discordTag: data.discordTag || null }),
       ...(data.bio !== undefined && { bio: data.bio || null }),
+      ...(skillRating !== undefined && { skillRating }),
     },
   });
 

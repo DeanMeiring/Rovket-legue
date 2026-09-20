@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { RANKS } from "@/lib/ranks";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function SignupPage() {
     displayName: "",
     rlTrackerUrl: "",
     platform: "",
+    rank: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -115,6 +117,24 @@ export default function SignupPage() {
               onChange={(e) => update("rlTrackerUrl", e.target.value)}
               placeholder="https://rocketleague.tracker.network/rocket-league/profile/..."
             />
+          </div>
+          <div>
+            <label className="label">Current rank (optional)</label>
+            <select
+              className="input"
+              value={form.rank}
+              onChange={(e) => update("rank", e.target.value)}
+            >
+              <option value="">Not sure / unranked</option>
+              {RANKS.map((r) => (
+                <option key={r.label} value={r.label}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Helps admins balance tryout teams. Doesn&apos;t need to be exact.
+            </p>
           </div>
           <div>
             <label className="label">Password</label>

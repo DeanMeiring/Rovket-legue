@@ -57,6 +57,13 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [replayUrl, setReplayUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    imported: string[];
+    unmatched: string[];
+  } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -82,6 +89,32 @@ export default function EventDetailPage() {
     setForm(emptyForm);
     await load();
     setSaving(false);
+  }
+
+  async function importReplay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!replayUrl.trim()) return;
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+
+    const res = await fetch(`/api/events/${params.id}/import-replay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ replayUrl }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    setImporting(false);
+
+    if (!res.ok) {
+      setImportError(data.error || "Couldn't import that replay.");
+      return;
+    }
+
+    setImportResult(data);
+    setReplayUrl("");
+    await load();
   }
 
   async function deletePerformance(id: string) {
@@ -172,6 +205,42 @@ export default function EventDetailPage() {
             <p className="text-slate-500 text-sm">No stats logged for this event yet.</p>
           )}
         </ul>
+
+        {isAdmin && (
+          <form onSubmit={importReplay} className="border-t border-border pt-4 space-y-2 mb-4">
+            <p className="label mb-0">Import stats from a ballchasing.com replay</p>
+            <div className="flex gap-2">
+              <input
+                className="input"
+                value={replayUrl}
+                onChange={(e) => setReplayUrl(e.target.value)}
+                placeholder="https://ballchasing.com/replay/..."
+              />
+              <button type="submit" disabled={importing} className="btn-secondary whitespace-nowrap">
+                {importing ? "Importing..." : "Import"}
+              </button>
+            </div>
+            {importError && <p className="text-red-400 text-sm">{importError}</p>}
+            {importResult && (
+              <div className="text-sm">
+                {importResult.imported.length > 0 && (
+                  <p className="text-green-400">
+                    Imported: {importResult.imported.join(", ")}
+                  </p>
+                )}
+                {importResult.unmatched.length > 0 && (
+                  <p className="text-yellow-400">
+                    Couldn&apos;t match to an app account (log them manually below): {importResult.unmatched.join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-slate-500">
+              Matches replay players to app accounts by name. Needs BALLCHASING_API_KEY
+              set on the server.
+            </p>
+          </form>
+        )}
 
         {isAdmin && (
           <form onSubmit={submitPerformance} className="border-t border-border pt-4 space-y-3">
