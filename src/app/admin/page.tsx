@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { rankLabelForValue } from "@/lib/ranks";
+import { preciseRankLabel } from "@/lib/ranks";
 
 type Team = { id: string; name: string; colorHex: string | null; members: { id: string }[] };
 type UserRow = {
@@ -215,7 +215,7 @@ export default function AdminPage() {
                     <div
                       key={f.key}
                       className="flex flex-col items-center"
-                      title={rankLabelForValue(u[f.key]) || "No rank set — used by the team balancer"}
+                      title={preciseRankLabel(u[f.key]) || "No rank set — used by the team balancer"}
                     >
                       <span className="text-[10px] text-slate-500">{f.label}</span>
                       <input

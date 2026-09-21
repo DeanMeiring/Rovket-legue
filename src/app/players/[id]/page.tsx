@@ -5,8 +5,8 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { PLAYLISTS, rankLabelForValue } from "@/lib/ranks";
-import RankPicker from "@/components/RankPicker";
+import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
+import PreciseRankPicker from "@/components/PreciseRankPicker";
 
 type Performance = {
   id: string;
@@ -49,10 +49,12 @@ export default function PlayerProfilePage() {
     platform: "",
     discordTag: "",
     bio: "",
-    rank1v1: "",
-    rank2v2: "",
-    rank3v3: "",
   });
+  const [ranks, setRanks] = useState<{
+    rank1v1: number | null;
+    rank2v2: number | null;
+    rank3v3: number | null;
+  }>({ rank1v1: null, rank2v2: null, rank3v3: null });
   const [saving, setSaving] = useState(false);
 
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -74,9 +76,11 @@ export default function PlayerProfilePage() {
         platform: data.platform || "",
         discordTag: data.discordTag || "",
         bio: data.bio || "",
-        rank1v1: rankLabelForValue(data.rank1v1) || "",
-        rank2v2: rankLabelForValue(data.rank2v2) || "",
-        rank3v3: rankLabelForValue(data.rank3v3) || "",
+      });
+      setRanks({
+        rank1v1: data.rank1v1 ?? null,
+        rank2v2: data.rank2v2 ?? null,
+        rank3v3: data.rank3v3 ?? null,
       });
     }
     setLoading(false);
@@ -93,7 +97,12 @@ export default function PlayerProfilePage() {
     await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        rank1v1Value: ranks.rank1v1,
+        rank2v2Value: ranks.rank2v2,
+        rank3v3Value: ranks.rank3v3,
+      }),
     });
     await load();
     setSaving(false);
@@ -185,7 +194,7 @@ export default function PlayerProfilePage() {
               <p>
                 🏅 Ranks:{" "}
                 {PLAYLISTS.filter((p) => player[p.key] != null)
-                  .map((p) => `${p.label.split(" ")[0]} ${rankLabelForValue(player[p.key])}`)
+                  .map((p) => `${p.label.split(" ")[0]} ${preciseRankLabel(player[p.key])}`)
                   .join(" · ")}
               </p>
             )}
@@ -235,12 +244,17 @@ export default function PlayerProfilePage() {
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
               />
             </div>
-            <div>
-              <label className="label">Current ranks</label>
-              <RankPicker
-                value={{ rank1v1: form.rank1v1, rank2v2: form.rank2v2, rank3v3: form.rank3v3 }}
-                onChange={(next) => setForm((f) => ({ ...f, ...next }))}
-              />
+            <div className="space-y-3">
+              <label className="label mb-0">Current ranks</label>
+              {PLAYLISTS.map((p) => (
+                <div key={p.key}>
+                  <p className="text-xs text-slate-500 mb-1">{p.label}</p>
+                  <PreciseRankPicker
+                    value={ranks[p.key]}
+                    onChange={(v) => setRanks((r) => ({ ...r, [p.key]: v }))}
+                  />
+                </div>
+              ))}
             </div>
             <button type="submit" disabled={saving} className="btn-primary">
               {saving ? "Saving..." : "Save changes"}

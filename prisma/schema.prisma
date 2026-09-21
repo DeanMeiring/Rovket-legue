@@ -50,6 +50,7 @@ model User {
   rank1v1        Int?
   rank2v2        Int?
   rank3v3        Int?
+  profileCompleted Boolean @default(false)
 
   teamId String?
   team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull)

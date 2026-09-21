@@ -18,6 +18,12 @@ const schema = z.object({
   rank1v1: rankField,
   rank2v2: rankField,
   rank3v3: rankField,
+  // Precise numeric values (Tier+SubRank+Division), used by the profile
+  // completion flow — bypasses the coarse label mapping above.
+  rank1v1Value: z.number().int().min(0).max(3000).nullable().optional(),
+  rank2v2Value: z.number().int().min(0).max(3000).nullable().optional(),
+  rank3v3Value: z.number().int().min(0).max(3000).nullable().optional(),
+  profileCompleted: z.boolean().optional(),
 });
 
 function rankValue(label: string | undefined): number | null {
@@ -51,6 +57,10 @@ export async function PATCH(req: Request) {
       ...(data.rank1v1 !== undefined && { rank1v1: rankValue(data.rank1v1) }),
       ...(data.rank2v2 !== undefined && { rank2v2: rankValue(data.rank2v2) }),
       ...(data.rank3v3 !== undefined && { rank3v3: rankValue(data.rank3v3) }),
+      ...(data.rank1v1Value !== undefined && { rank1v1: data.rank1v1Value }),
+      ...(data.rank2v2Value !== undefined && { rank2v2: data.rank2v2Value }),
+      ...(data.rank3v3Value !== undefined && { rank3v3: data.rank3v3Value }),
+      ...(data.profileCompleted !== undefined && { profileCompleted: data.profileCompleted }),
     },
   });
 
