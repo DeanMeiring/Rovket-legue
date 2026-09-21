@@ -7,9 +7,11 @@ export type RankValues = { rank1v1: string; rank2v2: string; rank3v3: string };
 export default function RankPicker({
   value,
   onChange,
+  required = false,
 }: {
   value: RankValues;
   onChange: (next: RankValues) => void;
+  required?: boolean;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -19,9 +21,10 @@ export default function RankPicker({
           <select
             className="input !py-1.5 text-sm"
             value={value[p.key]}
+            required={required}
             onChange={(e) => onChange({ ...value, [p.key]: e.target.value })}
           >
-            <option value="">—</option>
+            <option value="">{required ? "Select rank..." : "—"}</option>
             {RANKS.map((r) => (
               <option key={r.label} value={r.label}>
                 {r.label}

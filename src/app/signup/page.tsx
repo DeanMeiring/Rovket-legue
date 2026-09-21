@@ -121,14 +121,15 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="label">Current ranks (optional)</label>
+            <label className="label">Current ranks</label>
             <RankPicker
               value={{ rank1v1: form.rank1v1, rank2v2: form.rank2v2, rank3v3: form.rank3v3 }}
               onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+              required
             />
             <p className="text-xs text-slate-500 mt-1">
-              Fill in whichever playlists you play — helps admins balance tryout teams.
-              Doesn&apos;t need to be exact.
+              Helps admins balance tryout teams. Doesn&apos;t need to be exact — you&apos;ll
+              get a chance to refine it once you&apos;re approved.
             </p>
           </div>
           <div>

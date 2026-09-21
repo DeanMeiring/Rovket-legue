@@ -19,23 +19,19 @@ const schema = z.object({
   displayName: z.string().trim().min(1).max(80),
   rlTrackerUrl: z.string().trim().url().optional().or(z.literal("")),
   platform: z.string().trim().max(40).optional().or(z.literal("")),
-  rank1v1: z
-    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
-    .optional()
-    .or(z.literal("")),
-  rank2v2: z
-    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
-    .optional()
-    .or(z.literal("")),
-  rank3v3: z
-    .enum(RANKS.map((r) => r.label) as [string, ...string[]])
-    .optional()
-    .or(z.literal("")),
+  rank1v1: z.enum(RANKS.map((r) => r.label) as [string, ...string[]], {
+    errorMap: () => ({ message: "Pick your 1v1 rank." }),
+  }),
+  rank2v2: z.enum(RANKS.map((r) => r.label) as [string, ...string[]], {
+    errorMap: () => ({ message: "Pick your 2v2 rank." }),
+  }),
+  rank3v3: z.enum(RANKS.map((r) => r.label) as [string, ...string[]], {
+    errorMap: () => ({ message: "Pick your 3v3 rank." }),
+  }),
 });
 
-function rankValue(label: string | undefined): number | null {
-  if (!label) return null;
-  return RANKS.find((r) => r.label === label)?.value ?? null;
+function rankValue(label: string): number {
+  return RANKS.find((r) => r.label === label)!.value;
 }
 
 export async function POST(req: Request) {
