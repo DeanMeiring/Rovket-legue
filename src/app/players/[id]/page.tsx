@@ -55,6 +55,11 @@ export default function PlayerProfilePage() {
   });
   const [saving, setSaving] = useState(false);
 
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
   const isSelf = session?.user.id === params.id;
 
   async function load() {
@@ -93,6 +98,37 @@ export default function PlayerProfilePage() {
     await load();
     setSaving(false);
     setEditing(false);
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(false);
+
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwError("New passwords don't match.");
+      return;
+    }
+
+    setPwSaving(true);
+    const res = await fetch("/api/profile/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setPwSaving(false);
+
+    if (!res.ok) {
+      setPwError(data.error || "Couldn't change your password.");
+      return;
+    }
+
+    setPwSuccess(true);
+    setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
   }
 
   if (loading) return <p className="text-slate-500">Loading...</p>;
@@ -212,6 +248,54 @@ export default function PlayerProfilePage() {
           </form>
         )}
       </div>
+
+      {isSelf && (
+        <div className="card">
+          <h2 className="font-bold text-lg mb-1">Change password</h2>
+          <p className="text-slate-500 text-sm mb-4">
+            Needs your current password to confirm it&apos;s you.
+          </p>
+          <form onSubmit={changePassword} className="space-y-3 max-w-sm">
+            <div>
+              <label className="label">Current password</label>
+              <input
+                type="password"
+                className="input"
+                value={pwForm.currentPassword}
+                onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">New password</label>
+              <input
+                type="password"
+                minLength={8}
+                className="input"
+                value={pwForm.newPassword}
+                onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Confirm new password</label>
+              <input
+                type="password"
+                minLength={8}
+                className="input"
+                value={pwForm.confirmPassword}
+                onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
+                required
+              />
+            </div>
+            {pwError && <p className="text-red-400 text-sm">{pwError}</p>}
+            {pwSuccess && <p className="text-green-400 text-sm">Password changed.</p>}
+            <button type="submit" disabled={pwSaving} className="btn-primary">
+              {pwSaving ? "Saving..." : "Change password"}
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="card">
         <h2 className="font-bold text-lg mb-4">Career totals ({totals.games} sessions)</h2>

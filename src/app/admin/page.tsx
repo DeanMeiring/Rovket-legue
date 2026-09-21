@@ -53,6 +53,26 @@ export default function AdminPage() {
     await load();
   }
 
+  async function resetPassword(id: string, name: string) {
+    const newPassword = prompt(`New password for ${name} (at least 8 characters):`);
+    if (!newPassword) return;
+    if (newPassword.length < 8) {
+      alert("Password must be at least 8 characters.");
+      return;
+    }
+    const res = await fetch(`/api/admin/users/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword }),
+    });
+    if (res.ok) {
+      alert(`Password updated for ${name}.`);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Couldn't reset password.");
+    }
+  }
+
   async function removeUser(id: string) {
     if (!confirm("Remove this user permanently?")) return;
     await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
@@ -233,6 +253,12 @@ export default function AdminPage() {
                   <option value="PLAYER">Player</option>
                   <option value="ADMIN">Admin</option>
                 </select>
+                <button
+                  onClick={() => resetPassword(u.id, u.displayName || u.username)}
+                  className="text-accent2 hover:underline text-xs"
+                >
+                  Reset password
+                </button>
                 <button onClick={() => removeUser(u.id)} className="text-red-400 hover:underline text-xs">
                   Remove
                 </button>
