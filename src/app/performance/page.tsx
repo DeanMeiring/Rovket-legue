@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { format } from "date-fns";
+import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
+import PreciseRankPicker from "@/components/PreciseRankPicker";
 
 type Performance = {
   id: string;
@@ -17,10 +19,15 @@ type Performance = {
   event: { id: string; title: string; startTime: string; type: string } | null;
 };
 
+type RankValues = { rank1v1: number | null; rank2v2: number | null; rank3v3: number | null };
+
 export default function MyPerformancePage() {
   const { data: session } = useSession();
   const [performances, setPerformances] = useState<Performance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ranks, setRanks] = useState<RankValues>({ rank1v1: null, rank2v2: null, rank3v3: null });
+  const [editingRanks, setEditingRanks] = useState(false);
+  const [savingRanks, setSavingRanks] = useState(false);
 
   useEffect(() => {
     if (!session?.user.id) return;
@@ -28,7 +35,32 @@ export default function MyPerformancePage() {
       .then((r) => r.json())
       .then(setPerformances)
       .finally(() => setLoading(false));
+    fetch(`/api/players/${session.user.id}`)
+      .then((r) => r.json())
+      .then((data) =>
+        setRanks({
+          rank1v1: data.rank1v1 ?? null,
+          rank2v2: data.rank2v2 ?? null,
+          rank3v3: data.rank3v3 ?? null,
+        })
+      );
   }, [session?.user.id]);
+
+  async function saveRanks(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingRanks(true);
+    await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rank1v1Value: ranks.rank1v1,
+        rank2v2Value: ranks.rank2v2,
+        rank3v3Value: ranks.rank3v3,
+      }),
+    });
+    setSavingRanks(false);
+    setEditingRanks(false);
+  }
 
   const totals = performances.reduce(
     (acc, p) => {
@@ -47,6 +79,44 @@ export default function MyPerformancePage() {
   return (
     <div className="space-y-8 max-w-3xl">
       <h1 className="text-3xl font-bold">My Performance</h1>
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-bold text-lg">Your ranks</h2>
+          <button className="btn-secondary !py-1 !px-3 text-sm" onClick={() => setEditingRanks((v) => !v)}>
+            {editingRanks ? "Cancel" : "Edit"}
+          </button>
+        </div>
+        <p className="text-slate-500 text-sm mb-4">
+          Used by admins to balance tryout teams — keep these current.
+        </p>
+
+        {!editingRanks ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {PLAYLISTS.map((p) => (
+              <div key={p.key}>
+                <p className="text-xs text-slate-500">{p.label}</p>
+                <p className="font-semibold">{preciseRankLabel(ranks[p.key]) || "Not set"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <form onSubmit={saveRanks} className="space-y-4">
+            {PLAYLISTS.map((p) => (
+              <div key={p.key}>
+                <p className="text-xs text-slate-500 mb-1">{p.label}</p>
+                <PreciseRankPicker
+                  value={ranks[p.key]}
+                  onChange={(v) => setRanks((r) => ({ ...r, [p.key]: v }))}
+                />
+              </div>
+            ))}
+            <button type="submit" disabled={savingRanks} className="btn-primary">
+              {savingRanks ? "Saving..." : "Save ranks"}
+            </button>
+          </form>
+        )}
+      </div>
 
       {loading && <p className="text-slate-500">Loading...</p>}
 

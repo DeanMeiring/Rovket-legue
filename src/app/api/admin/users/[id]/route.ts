@@ -27,13 +27,27 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const before = await prisma.user.findUnique({ where: { id: params.id } });
   if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const data = { ...parsed.data };
+  const isNewlyApproved = data.status === "APPROVED" && before.status !== "APPROVED";
+
+  // Freshly-approved players with no team land in a default holding squad;
+  // admins move them into 1st/2nd/3rd/4th team once tryouts wrap up.
+  if (isNewlyApproved && !before.teamId && data.teamId === undefined) {
+    const holdingTeam = await prisma.team.upsert({
+      where: { name: "BC USSA" },
+      update: {},
+      create: { name: "BC USSA" },
+    });
+    data.teamId = holdingTeam.id;
+  }
+
   const user = await prisma.user.update({
     where: { id: params.id },
-    data: parsed.data,
+    data,
     include: { team: true },
   });
 
-  if (parsed.data.status === "APPROVED" && before.status !== "APPROVED") {
+  if (isNewlyApproved) {
     void sendEmail(
       user.email,
       "You're approved! Welcome to the team hub",
