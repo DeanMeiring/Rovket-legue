@@ -82,14 +82,15 @@ export default function AvailabilityPage() {
         </p>
       </div>
 
-      <div className="card overflow-x-auto">
-        <table className="w-full table-fixed text-sm border-separate border-spacing-1">
+      <div className="card overflow-x-auto !px-3 sm:!px-5">
+        <table className="w-full table-fixed text-sm border-separate border-spacing-0.5 sm:border-spacing-1">
           <thead>
             <tr>
-              <th className="w-28" />
+              <th className="w-20 sm:w-28" />
               {DAYS.map((d) => (
                 <th key={d.key} className="font-medium text-slate-400 pb-1">
-                  {d.label}
+                  <span className="sm:hidden">{d.short}</span>
+                  <span className="hidden sm:inline">{d.label}</span>
                 </th>
               ))}
             </tr>
@@ -104,7 +105,10 @@ export default function AvailabilityPage() {
                     title="Tick or clear the whole row"
                   >
                     <span className="block font-medium">{b.label}</span>
-                    <span className="block text-xs text-slate-500 font-normal">{b.hours}</span>
+                    <span className="block text-[10px] sm:text-xs text-slate-500 font-normal">
+                      <span className="sm:hidden">{b.hoursShort}</span>
+                      <span className="hidden sm:inline">{b.hours}</span>
+                    </span>
                   </button>
                 </th>
                 {DAYS.map((d) => {
@@ -122,7 +126,14 @@ export default function AvailabilityPage() {
                             : "border-border text-slate-500 hover:border-slate-500"
                         }`}
                       >
-                        {on ? "Free" : ""}
+                        {on ? (
+                          <>
+                            <span className="sm:hidden">✓</span>
+                            <span className="hidden sm:inline">Free</span>
+                          </>
+                        ) : (
+                          ""
+                        )}
                       </button>
                     </td>
                   );

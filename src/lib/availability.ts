@@ -4,13 +4,13 @@ import { z } from "zod";
 // Times are the club's local time.
 
 export const DAYS = [
-  { key: "mon", label: "Mon" },
-  { key: "tue", label: "Tue" },
-  { key: "wed", label: "Wed" },
-  { key: "thu", label: "Thu" },
-  { key: "fri", label: "Fri" },
-  { key: "sat", label: "Sat" },
-  { key: "sun", label: "Sun" },
+  { key: "mon", label: "Mon", short: "M" },
+  { key: "tue", label: "Tue", short: "T" },
+  { key: "wed", label: "Wed", short: "W" },
+  { key: "thu", label: "Thu", short: "T" },
+  { key: "fri", label: "Fri", short: "F" },
+  { key: "sat", label: "Sat", short: "S" },
+  { key: "sun", label: "Sun", short: "S" },
 ] as const;
 
 export const BLOCKS = [
@@ -18,6 +18,7 @@ export const BLOCKS = [
     key: "morning",
     label: "Morning",
     hours: "08:00 to 12:00",
+    hoursShort: "08-12",
     start: 8,
     end: 12,
   },
@@ -25,6 +26,7 @@ export const BLOCKS = [
     key: "afternoon",
     label: "Afternoon",
     hours: "12:00 to 17:00",
+    hoursShort: "12-17",
     start: 12,
     end: 17,
   },
@@ -32,10 +34,11 @@ export const BLOCKS = [
     key: "evening",
     label: "Evening",
     hours: "17:00 to 20:00",
+    hoursShort: "17-20",
     start: 17,
     end: 20,
   },
-  { key: "night", label: "Night", hours: "20:00 to 00:00", start: 20, end: 24 },
+  { key: "night", label: "Night", hours: "20:00 to 00:00", hoursShort: "20-24", start: 20, end: 24 },
 ] as const;
 
 export const ALL_SLOTS: string[] = DAYS.flatMap((d) => BLOCKS.map((b) => `${d.key}-${b.key}`));
