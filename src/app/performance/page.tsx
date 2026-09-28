@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
 import PreciseRankPicker from "@/components/PreciseRankPicker";
+import { PlayerBenchmarkCard } from "@/components/ReplayStats";
+import type { Averages } from "@/lib/replayStats";
 
 type Performance = {
   id: string;
@@ -28,6 +30,7 @@ export default function MyPerformancePage() {
   const [ranks, setRanks] = useState<RankValues>({ rank1v1: null, rank2v2: null, rank3v3: null });
   const [editingRanks, setEditingRanks] = useState(false);
   const [savingRanks, setSavingRanks] = useState(false);
+  const [replay, setReplay] = useState<{ stats: unknown[]; clubAvg: Averages } | null>(null);
 
   useEffect(() => {
     if (!session?.user.id) return;
@@ -37,13 +40,16 @@ export default function MyPerformancePage() {
       .finally(() => setLoading(false));
     fetch(`/api/players/${session.user.id}`)
       .then((r) => r.json())
-      .then((data) =>
+      .then((data) => {
         setRanks({
           rank1v1: data.rank1v1 ?? null,
           rank2v2: data.rank2v2 ?? null,
           rank3v3: data.rank3v3 ?? null,
-        })
-      );
+        });
+        if (data.clubAvg) {
+          setReplay({ stats: (data.performances ?? []).map((p: { stats: unknown }) => p.stats), clubAvg: data.clubAvg });
+        }
+      });
   }, [session?.user.id]);
 
   async function saveRanks(e: React.FormEvent) {
@@ -151,6 +157,8 @@ export default function MyPerformancePage() {
               ))}
             </div>
           </div>
+
+          {replay && <PlayerBenchmarkCard stats={replay.stats} clubAvg={replay.clubAvg} />}
 
           <div className="card">
             <h2 className="font-bold text-lg mb-4">History</h2>
