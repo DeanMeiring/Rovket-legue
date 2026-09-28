@@ -148,6 +148,64 @@ model TryoutPlayer {
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  gameStats TryoutGameStat[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// One generated 3v3 tryout game. Sides hold TryoutPlayer ids, balanced on
+// rating when generated. Stats arrive later from a ballchasing.com replay.
+model TryoutGame {
+  id          String   @id @default(cuid())
+  number      Int      @unique
+  round       Int
+  blueIds     String[]
+  orangeIds   String[]
+  blueGoals   Int?
+  orangeGoals Int?
+
+  ballchasingId String?
+  // "pending" while ballchasing is still processing the upload, then "ok"
+  replayStatus  String?
+
+  stats TryoutGameStat[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TryoutGameStat {
+  id       String       @id @default(cuid())
+  gameId   String
+  game     TryoutGame   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  playerId String
+  player   TryoutPlayer @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  side    String // "blue" | "orange"
+  win     Boolean
+  goals   Int     @default(0)
+  assists Int     @default(0)
+  saves   Int     @default(0)
+  shots   Int     @default(0)
+  score   Int     @default(0)
+  mvp     Boolean @default(false)
+
+  boostPerMinute    Float?
+  avgSpeed          Float?
+  percentBehindBall Float?
+  demosInflicted    Int?
+  // Full ballchasing stats block for this player, used by the AI evaluation.
+  raw               Json?
+
+  @@unique([gameId, playerId])
+  @@index([playerId])
+}
+
+// Saved AI write-ups of the tryout stats, newest shown first.
+model TryoutEvaluation {
+  id        String   @id @default(cuid())
+  text      String
+  model     String
+  createdAt DateTime @default(now())
 }
