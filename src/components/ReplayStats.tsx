@@ -113,6 +113,11 @@ export function PlayerStatTiles({ stats, eventAvg }: { stats: unknown[]; eventAv
                 <p className="text-[11px] text-slate-400 truncate">{m.label}</p>
                 <p className="text-base font-semibold tabular-nums">{formatMetric(m, mine.values[m.key])}</p>
                 <p className="text-[11px] text-slate-500">event avg {formatMetric(m, eventAvg.values[m.key])}</p>
+                {m.pro && (
+                  <p className="text-[11px] text-emerald-400/80">
+                    pro {formatMetric(m, m.pro[0])} to {formatMetric(m, m.pro[1])}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -122,5 +127,112 @@ export function PlayerStatTiles({ stats, eventAvg }: { stats: unknown[]; eventAv
         Averaged over {mine.games} game{mine.games === 1 ? "" : "s"} with replay stats.
       </p>
     </div>
+  );
+}
+
+// One player's replay stats over every imported game, each stat drawn on a
+// track with the pro range and the club average for comparison.
+export function PlayerBenchmarkCard({ stats, clubAvg }: { stats: unknown[]; clubAvg: Averages }) {
+  const [group, setGroup] = useState<(typeof GROUPS)[number]>("Boost");
+  const mine = useMemo(() => averageStats(stats), [stats]);
+  if (!mine.games) return null;
+
+  return (
+    <div className="card">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+        <h2 className="font-bold text-lg">Replay stats vs pros</h2>
+        <span className="text-xs text-slate-500">
+          Per-game averages over {mine.games} game{mine.games === 1 ? "" : "s"} from every event
+        </span>
+      </div>
+      <div className="flex gap-2 flex-wrap mb-4" role="tablist">
+        {GROUPS.map((g) => (
+          <button
+            key={g}
+            role="tab"
+            aria-selected={group === g}
+            onClick={() => setGroup(g)}
+            className={`px-3 py-1 rounded-full text-sm border ${
+              group === g ? "border-accent2 text-white bg-accent2/15" : "border-border text-slate-400 hover:text-white"
+            }`}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+      <ul className="space-y-4">
+        {METRICS.filter((m) => m.group === group).map((m) => (
+          <BenchmarkRow key={m.key} metric={m} value={mine.values[m.key]} club={clubAvg.values[m.key]} />
+        ))}
+      </ul>
+      <div className="flex gap-4 flex-wrap mt-4 text-[11px] text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-accent2" /> This player
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-4 h-2 rounded-sm bg-emerald-400/30 border border-emerald-400/60" /> Pro range
+          (RLCS 2024 Worlds)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-0.5 h-3 bg-slate-300" /> Club average
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-500 mt-2">
+        Pro numbers are a ceiling, not a target. Stats marked &quot;depends on role&quot; aren&apos;t better high or low.
+      </p>
+    </div>
+  );
+}
+
+function BenchmarkRow({ metric: m, value, club }: { metric: Metric; value: number | null; club: number | null }) {
+  const top = Math.max(value ?? 0, club ?? 0, m.pro?.[1] ?? 0) * 1.15 || 1;
+  const pct = (v: number) => `${Math.min(100, (v / top) * 100)}%`;
+  const verdict =
+    value == null || !m.pro
+      ? null
+      : value < m.pro[0]
+        ? "below pro range"
+        : value > m.pro[1]
+          ? "above pro range"
+          : "in pro range";
+  return (
+    <li>
+      <div className="flex items-baseline justify-between gap-3 text-sm mb-1">
+        <span className="text-slate-300">
+          {m.label}
+          <span className="text-slate-500 text-xs"> · {BETTER[m.better].toLowerCase()}</span>
+        </span>
+        <span className="tabular-nums font-semibold">{formatMetric(m, value)}</span>
+      </div>
+      <div
+        className="relative h-3 rounded-full bg-slate-800/70"
+        title={[
+          `${m.label}: ${formatMetric(m, value)}`,
+          m.pro && `Pro: ${formatMetric(m, m.pro[0])} to ${formatMetric(m, m.pro[1])}`,
+          `Club average: ${formatMetric(m, club)}`,
+        ]
+          .filter(Boolean)
+          .join("\n")}
+      >
+        {m.pro && (
+          <span
+            className="absolute inset-y-0 rounded-sm bg-emerald-400/30 border border-emerald-400/60"
+            style={{ left: pct(m.pro[0]), width: `max(4px, calc(${pct(m.pro[1])} - ${pct(m.pro[0])}))` }}
+          />
+        )}
+        {club != null && <span className="absolute -inset-y-0.5 w-0.5 bg-slate-300" style={{ left: pct(club) }} />}
+        {value != null && (
+          <span
+            className="absolute top-1/2 w-3 h-3 -ml-1.5 -mt-1.5 rounded-full bg-accent2 ring-2 ring-panel"
+            style={{ left: pct(value) }}
+          />
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500 mt-1">
+        Club avg {formatMetric(m, club)}
+        {m.pro ? ` · pro ${formatMetric(m, m.pro[0])} to ${formatMetric(m, m.pro[1])}` : " · no sourced pro number"}
+        {verdict && ` · ${verdict}`}
+      </p>
+    </li>
   );
 }

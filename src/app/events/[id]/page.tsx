@@ -83,6 +83,23 @@ export default function EventDetailPage() {
   const [showUnmatched, setShowUnmatched] = useState(false);
   const [reviewing, setReviewing] = useState<PlayerRef | null>(null);
   const [openPlayer, setOpenPlayer] = useState<string | null>(null);
+  const [bulk, setBulk] = useState<{ done: number; total: number; failed: string[]; running: boolean } | null>(null);
+
+  // Writes a fresh draft review for every player in this event, one at a time.
+  async function reviewEveryone(players: PlayerRef[]) {
+    if (!confirm(`Write a new draft review for all ${players.length} players? Each one is a Claude call.`)) return;
+    const failed: string[] = [];
+    setBulk({ done: 0, total: players.length, failed, running: true });
+    for (const [i, p] of players.entries()) {
+      const res = await fetch("/api/admin/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: p.id }),
+      }).catch(() => null);
+      if (!res?.ok) failed.push(nameWithTag(p));
+      setBulk({ done: i + 1, total: players.length, failed: [...failed], running: i + 1 < players.length });
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -319,7 +336,25 @@ export default function EventDetailPage() {
       />
 
       <div className="card">
-        <h2 className="font-bold text-lg mb-4">Performance</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <h2 className="font-bold text-lg">Performance</h2>
+          {isAdmin && event.performances.length > 0 && (
+            <button
+              onClick={() => reviewEveryone(groupByPlayer(event.performances).map((g) => g.user))}
+              disabled={bulk?.running}
+              className="btn-secondary !py-1 !px-3 text-sm"
+            >
+              {bulk?.running ? `Writing reviews... ${bulk.done} of ${bulk.total}` : "Write reviews for everyone"}
+            </button>
+          )}
+        </div>
+        {isAdmin && bulk && !bulk.running && (
+          <p className="text-sm text-slate-400 mb-4">
+            Wrote {bulk.done - bulk.failed.length} draft review{bulk.done - bulk.failed.length === 1 ? "" : "s"}. Open each
+            player&apos;s Review to check it and publish it.
+            {bulk.failed.length > 0 && <span className="text-red-400"> Failed: {bulk.failed.join(", ")}.</span>}
+          </p>
+        )}
         {isAdmin && unmatchedCount > 0 && (
           <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 mb-4 text-sm">
             <span className="text-yellow-200">

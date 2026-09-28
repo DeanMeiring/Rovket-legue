@@ -22,13 +22,20 @@ export type BallchasingPlayer = {
   };
 };
 
+export type BallchasingTeam = {
+  name?: string;
+  goals?: number;
+  stats?: { core?: { goals?: number } };
+  players?: BallchasingPlayer[];
+};
+
 export type BallchasingReplay = {
   id: string;
   // "pending" while ballchasing parses a fresh upload, then "ok" or "failed"
   status?: string;
   title?: string;
-  blue: { name?: string; goals?: number; players?: BallchasingPlayer[] };
-  orange: { name?: string; goals?: number; players?: BallchasingPlayer[] };
+  blue: BallchasingTeam;
+  orange: BallchasingTeam;
 };
 
 // Accepts a bare replay id or a full ballchasing.com URL, e.g.
@@ -127,4 +134,13 @@ export async function listGroupReplays(group: string): Promise<{ id: string; tit
     url = data.next ?? null;
   }
   return out.map((r) => ({ id: r.id, title: r.title }));
+}
+
+// Ballchasing gives a team's goals under stats.core; older fixtures had them
+// at the top level. Fall back to adding up the players' goals.
+export function teamGoals(team: BallchasingTeam | undefined): number {
+  if (!team) return 0;
+  const fromStats = team.stats?.core?.goals ?? team.goals;
+  if (typeof fromStats === "number") return fromStats;
+  return (team.players || []).reduce((n, p) => n + (p.stats?.core?.goals ?? 0), 0);
 }

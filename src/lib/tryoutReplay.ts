@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { fetchReplay } from "@/lib/ballchasing";
+import { fetchReplay, teamGoals } from "@/lib/ballchasing";
 
 export type ImportResult =
   | { status: "pending" }
@@ -29,8 +29,8 @@ export async function importReplayStats(gameId: string, ballchasingId: string): 
     return hits.find((p) => inGame.has(p.id)) ?? hits[0];
   };
 
-  const blueGoals = replay.blue?.goals ?? 0;
-  const orangeGoals = replay.orange?.goals ?? 0;
+  const blueGoals = teamGoals(replay.blue);
+  const orangeGoals = teamGoals(replay.orange);
   const matched: string[] = [];
   const unmatched: string[] = [];
   const rows = [];

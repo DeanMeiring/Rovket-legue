@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { BallchasingReplay, fetchReplay, listGroupReplays, parseBallchasingLink } from "@/lib/ballchasing";
+import { BallchasingReplay, fetchReplay, teamGoals, listGroupReplays, parseBallchasingLink } from "@/lib/ballchasing";
 
 const schema = z.object({
   replayUrl: z.string().trim().min(1),
@@ -50,16 +50,35 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       })
     ).map((r) => r.replayId),
   );
-  // Games imported before the detailed stats were kept get fetched again once
-  // to fill them in.
-  const missingStats = await prisma.performance.findMany({
-    where: { eventId: event.id, replayId: { in: replayIds }, stats: { equals: Prisma.DbNull } },
-    select: { replayId: true },
-    distinct: ["replayId"],
-  });
+  // Games imported before the detailed stats were kept, or before wins were
+  // read correctly (every game has a winner), get fetched again to fix them.
+  const [missingStats, withWinner, pendingWinner] = await Promise.all([
+    prisma.performance.findMany({
+      where: { eventId: event.id, replayId: { in: replayIds }, stats: { equals: Prisma.DbNull } },
+      select: { replayId: true },
+      distinct: ["replayId"],
+    }),
+    prisma.performance.findMany({
+      where: { eventId: event.id, replayId: { in: replayIds }, win: true },
+      select: { replayId: true },
+      distinct: ["replayId"],
+    }),
+    prisma.pendingPerformance.findMany({
+      where: { eventId: event.id, replayId: { in: replayIds }, win: true },
+      select: { replayId: true },
+      distinct: ["replayId"],
+    }),
+  ]);
+  const hasWinner = new Set([...withWinner, ...pendingWinner].map((r) => r.replayId));
   const refill = new Set<string>();
   for (const m of missingStats) {
     if (m.replayId && done.delete(m.replayId)) refill.add(m.replayId);
+  }
+  for (const id of [...done]) {
+    if (!hasWinner.has(id)) {
+      done.delete(id);
+      refill.add(id);
+    }
   }
 
   const users = await prisma.user.findMany({
@@ -115,8 +134,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       continue;
     }
 
-    const blueGoals = replay.blue?.goals ?? 0;
-    const orangeGoals = replay.orange?.goals ?? 0;
+    const blueGoals = teamGoals(replay.blue);
+    const orangeGoals = teamGoals(replay.orange);
     const teams = [
       { players: replay.blue?.players || [], won: blueGoals > orangeGoals },
       { players: replay.orange?.players || [], won: orangeGoals > blueGoals },
@@ -124,6 +143,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const rows = [];
     const pending = [];
+    const winners: string[] = [];
     for (const team of teams) {
       for (const p of team.players) {
         const core = p.stats?.core || {};
@@ -140,6 +160,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           stats: p.stats as object,
         };
         const user = findUser(p.name);
+        if (team.won) winners.push(p.name.trim());
         if (!user) {
           // A refill doesn't ask again about names already dealt with.
           if (refill.has(replayId)) continue;
@@ -157,11 +178,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       // Fills in detailed stats on rows that were imported without them.
       ...rows.map((r) =>
         prisma.performance.updateMany({
-          where: { eventId: event.id, replayId, userId: r.userId, stats: { equals: Prisma.DbNull } },
-          data: { stats: r.stats },
+          where: { eventId: event.id, replayId, userId: r.userId },
+          data: { stats: r.stats, win: r.win },
         }),
       ),
       prisma.pendingPerformance.createMany({ data: pending, skipDuplicates: true }),
+      ...winners.map((name) =>
+        prisma.pendingPerformance.updateMany({ where: { eventId: event.id, replayId, playerName: name }, data: { win: true } }),
+      ),
       prisma.eventReplay.createMany({ data: [{ eventId: event.id, replayId }], skipDuplicates: true }),
     ]);
     games++;
@@ -193,3 +217,4 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   ]);
   return NextResponse.json({ removed: removed.count });
 }
+

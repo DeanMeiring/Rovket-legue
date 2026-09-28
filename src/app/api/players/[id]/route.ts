@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { averageStats } from "@/lib/replayStats";
 import { requireApprovedUser } from "@/lib/session";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -30,5 +32,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   });
 
   if (!player) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(player);
+  // Club average over every imported game with detailed stats, for comparison.
+  const all = await prisma.performance.findMany({ where: { stats: { not: Prisma.DbNull } }, select: { stats: true } });
+  return NextResponse.json({ ...player, clubAvg: averageStats(all.map((p) => p.stats)) });
 }
