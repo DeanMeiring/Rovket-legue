@@ -10,7 +10,27 @@ async function main() {
 
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
-    console.log(`Admin user "${username}" already exists, skipping.`);
+    // Railway's ADMIN_PASSWORD is the source of truth for this account: every
+    // deploy resets the login to it, so changing the variable changes the
+    // password. Only when the variable is actually set, never the fallback.
+    if (!process.env.ADMIN_PASSWORD) {
+      console.log(`Admin user "${username}" already exists; ADMIN_PASSWORD not set, leaving it alone.`);
+      return;
+    }
+    const matches = await bcrypt.compare(process.env.ADMIN_PASSWORD, existing.passwordHash);
+    if (matches && existing.role === "ADMIN" && existing.status === "APPROVED") {
+      console.log(`Admin user "${username}" already matches ADMIN_PASSWORD.`);
+      return;
+    }
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD, 12),
+        role: "ADMIN",
+        status: "APPROVED",
+      },
+    });
+    console.log(`Admin user "${username}" synced to ADMIN_PASSWORD.`);
     return;
   }
 
@@ -28,7 +48,7 @@ async function main() {
   });
 
   console.log(`Created admin user "${username}" <${email}>.`);
-  console.log("Log in with the password from ADMIN_PASSWORD and change it afterwards.");
+  console.log("Log in with the password from ADMIN_PASSWORD.");
 }
 
 main()
