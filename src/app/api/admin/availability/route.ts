@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
   const [players, events] = await Promise.all([
     prisma.user.findMany({
-      where: { status: "APPROVED" },
+      where: { status: "APPROVED", isPlayer: true },
       orderBy: [{ displayName: "asc" }, { username: "asc" }],
       select: {
         id: true,

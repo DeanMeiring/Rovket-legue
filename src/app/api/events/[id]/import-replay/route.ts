@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const users = await prisma.user.findMany({
-    where: { status: "APPROVED" },
+    where: { status: "APPROVED", isPlayer: true },
     select: { id: true, username: true, displayName: true },
   });
 

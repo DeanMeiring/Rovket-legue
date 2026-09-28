@@ -15,6 +15,7 @@ type PlayerRow = {
   rank2v2: number | null;
   rank3v3: number | null;
   teamId: string | null;
+  isPlayer: boolean;
 };
 
 type RankKey = "rank1v1" | "rank2v2" | "rank3v3";
@@ -34,7 +35,7 @@ export default function BalanceTeamsPage() {
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((users: PlayerRow[]) => {
-        const approved = users.filter((u) => u.status === "APPROVED");
+        const approved = users.filter((u) => u.status === "APPROVED" && u.isPlayer);
         setPlayers(approved);
         const initialSelected: Record<string, boolean> = {};
         approved.forEach((u) => {

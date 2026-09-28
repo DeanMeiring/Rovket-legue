@@ -12,6 +12,7 @@ type UserRow = {
   displayName: string | null;
   role: string;
   status: string;
+  isPlayer: boolean;
   rlTrackerUrl: string | null;
   rank1v1: number | null;
   rank2v2: number | null;
@@ -98,7 +99,8 @@ export default function AdminPage() {
   }
 
   const pending = users.filter((u) => u.status === "PENDING");
-  const approved = users.filter((u) => u.status === "APPROVED");
+  const approved = users.filter((u) => u.status === "APPROVED" && u.isPlayer);
+  const staff = users.filter((u) => u.status === "APPROVED" && !u.isPlayer);
   const rejected = users.filter((u) => u.status === "REJECTED");
 
   return (
@@ -251,6 +253,15 @@ export default function AdminPage() {
                   <option value="PLAYER">Player</option>
                   <option value="ADMIN">Admin</option>
                 </select>
+                {u.role === "ADMIN" && (
+                  <button
+                    onClick={() => updateUser(u.id, { isPlayer: false })}
+                    className="text-slate-400 hover:underline text-xs"
+                    title="Keep admin access but take them off the roster, availability and RSVP lists"
+                  >
+                    Not a player
+                  </button>
+                )}
                 <button
                   onClick={() => resetPassword(u.id, u.displayName || u.username)}
                   className="text-accent2 hover:underline text-xs"
@@ -264,6 +275,43 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="card">
+        <h2 className="font-bold text-lg mb-1">Staff admins ({staff.length})</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Admins who run the site but don&apos;t play. They don&apos;t appear on the roster, in availability, RSVP lists
+          or team balancing.
+        </p>
+        <ul className="space-y-2 mb-5">
+          {staff.map((u) => (
+            <li key={u.id} className="flex items-center justify-between gap-3 flex-wrap text-sm">
+              <span>
+                {u.displayName || u.username}{" "}
+                <span className="text-slate-500">
+                  @{u.username} · {u.email}
+                </span>
+                {u.role !== "ADMIN" && <span className="badge bg-red-500/20 text-red-300 ml-2">Not an admin</span>}
+              </span>
+              <div className="flex gap-3">
+                <button className="text-accent2 hover:underline text-xs" onClick={() => updateUser(u.id, { isPlayer: true })}>
+                  Make a player too
+                </button>
+                <button
+                  onClick={() => resetPassword(u.id, u.displayName || u.username)}
+                  className="text-accent2 hover:underline text-xs"
+                >
+                  Reset password
+                </button>
+                <button onClick={() => removeUser(u.id)} className="text-red-400 hover:underline text-xs">
+                  Remove
+                </button>
+              </div>
+            </li>
+          ))}
+          {staff.length === 0 && <p className="text-slate-500 text-sm">No staff admins yet.</p>}
+        </ul>
+        <AddAdminForm onAdded={load} />
       </section>
 
       {rejected.length > 0 && (
@@ -362,5 +410,88 @@ function TrackerField({ user, onSaved }: { user: UserRow; onSaved: () => void })
       </div>
       {error && <p className="text-red-400 text-xs">{error}</p>}
     </div>
+  );
+}
+
+// Creates an approved admin account. By default they're staff only, not a player.
+function AddAdminForm({ onAdded }: { onAdded: () => void }) {
+  const empty = { displayName: "", username: "", email: "", password: "", isPlayer: false };
+  const [form, setForm] = useState(empty);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setDone(null);
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!res.ok) {
+      setError(data.error || "Couldn't add that admin.");
+      return;
+    }
+    setDone(`${form.displayName} can now log in as ${form.username.trim().toLowerCase()}. They've been emailed.`);
+    setForm(empty);
+    onAdded();
+  }
+
+  return (
+    <form onSubmit={submit} className="border-t border-border/60 pt-4 space-y-3">
+      <h3 className="font-semibold">Add admin</h3>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <input
+          className="input"
+          placeholder="Name"
+          required
+          value={form.displayName}
+          onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+        />
+        <input
+          className="input"
+          placeholder="Username"
+          required
+          autoCapitalize="none"
+          value={form.username}
+          onChange={(e) => setForm({ ...form, username: e.target.value })}
+        />
+        <input
+          className="input"
+          type="email"
+          placeholder="Email"
+          required
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <input
+          className="input"
+          type="password"
+          placeholder="Starting password (8+ characters)"
+          required
+          minLength={8}
+          autoComplete="new-password"
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" checked={form.isPlayer} onChange={(e) => setForm({ ...form, isPlayer: e.target.checked })} />
+        They also play (show them on the roster and RSVP lists)
+      </label>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button type="submit" disabled={saving} className="btn-primary">
+          {saving ? "Adding..." : "Add admin"}
+        </button>
+        {error && <span className="text-red-400 text-sm">{error}</span>}
+        {done && <span className="text-green-400 text-sm">{done}</span>}
+      </div>
+      <p className="text-xs text-slate-500">Give them the password yourself. The email only tells them their username.</p>
+    </form>
   );
 }

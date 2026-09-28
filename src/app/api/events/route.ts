@@ -57,13 +57,14 @@ export async function POST(req: Request) {
     },
   });
 
+  // Everyone approved hears about the event; only players get an RSVP row.
   const players = await prisma.user.findMany({
     where: { status: "APPROVED" },
-    select: { email: true, id: true },
+    select: { email: true, id: true, isPlayer: true },
   });
 
   await prisma.eventRsvp.createMany({
-    data: players.map((p) => ({ eventId: event.id, userId: p.id })),
+    data: players.filter((p) => p.isPlayer).map((p) => ({ eventId: event.id, userId: p.id })),
     skipDuplicates: true,
   });
 

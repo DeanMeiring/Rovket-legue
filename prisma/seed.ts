@@ -44,6 +44,7 @@ async function main() {
       role: "ADMIN",
       status: "APPROVED",
       displayName: "Team Manager",
+      isPlayer: false,
     },
   });
 
