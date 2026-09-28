@@ -31,6 +31,7 @@ const schema = z.object({
   location: z.string().trim().max(200).optional().or(z.literal("")),
   startTime: z.string().optional(),
   endTime: z.string().optional().or(z.literal("")),
+  rsvpOpen: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -56,6 +57,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       ...(data.location !== undefined && { location: data.location || null }),
       ...(data.startTime !== undefined && { startTime: new Date(data.startTime) }),
       ...(data.endTime !== undefined && { endTime: data.endTime ? new Date(data.endTime) : null }),
+      ...(data.rsvpOpen !== undefined && { rsvpOpen: data.rsvpOpen }),
     },
   });
 

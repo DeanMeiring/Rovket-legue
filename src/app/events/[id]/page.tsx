@@ -33,6 +33,7 @@ type EventDetail = {
   location: string | null;
   startTime: string;
   endTime: string | null;
+  rsvpOpen: boolean;
   rsvps: Rsvp[];
   performances: Performance[];
 };
@@ -77,6 +78,16 @@ export default function EventDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  async function toggleRsvps() {
+    if (!event) return;
+    await fetch(`/api/events/${event.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rsvpOpen: !event.rsvpOpen }),
+    });
+    await load();
+  }
 
   async function submitPerformance(e: React.FormEvent) {
     e.preventDefault();
@@ -164,7 +175,15 @@ export default function EventDetailPage() {
       </div>
 
       <div className="card">
-        <h2 className="font-bold text-lg mb-4">RSVPs</h2>
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h2 className="font-bold text-lg">RSVPs</h2>
+          {isAdmin && (
+            <button onClick={toggleRsvps} className="btn-secondary !py-1 !px-3 text-sm">
+              {event.rsvpOpen ? "Close RSVPs" : "Open RSVPs"}
+            </button>
+          )}
+        </div>
+        {!event.rsvpOpen && <p className="text-sm text-slate-400 mb-3">RSVPs open once the teams are confirmed.</p>}
         <ul className="space-y-2">
           {event.rsvps.map((r) => (
             <li key={r.id} className="flex items-center justify-between text-sm">

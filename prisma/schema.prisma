@@ -56,10 +56,11 @@ model User {
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
-  createdEvents Event[]       @relation("EventCreatedBy")
+  createdEvents Event[]             @relation("EventCreatedBy")
   rsvps         EventRsvp[]
   performances  Performance[]
   tryoutEntry   TryoutPlayer?
+  availability  PlayerAvailability?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -89,6 +90,10 @@ model Event {
   createdBy   User   @relation("EventCreatedBy", fields: [createdById], references: [id])
 
   reminderSentAt DateTime?
+
+  // Players can only RSVP while this is on. Tournaments start closed until
+  // the teams are confirmed.
+  rsvpOpen Boolean @default(true)
 
   rsvps        EventRsvp[]
   performances Performance[]
@@ -214,4 +219,14 @@ model TryoutEvaluation {
   text      String
   model     String
   createdAt DateTime @default(now())
+}
+
+// A player's usual weekly availability, as "<day>-<block>" keys such as
+// "mon-evening" (see src/lib/availability.ts).
+model PlayerAvailability {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slots     String[]
+  note      String?
+  updatedAt DateTime @updatedAt
 }

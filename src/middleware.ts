@@ -28,6 +28,7 @@ export const config = {
     "/events/:path*",
     "/players/:path*",
     "/performance/:path*",
+    "/availability/:path*",
     "/admin/:path*",
   ],
 };

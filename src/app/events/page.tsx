@@ -22,6 +22,7 @@ type EventItem = {
   location: string | null;
   startTime: string;
   endTime: string | null;
+  rsvpOpen: boolean;
   rsvps: Rsvp[];
   createdBy: { displayName: string | null; username: string };
 };
@@ -50,6 +51,17 @@ export default function EventsPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
+    });
+    await load();
+    setUpdating(null);
+  }
+
+  async function setRsvpOpen(eventId: string, rsvpOpen: boolean) {
+    setUpdating(eventId);
+    await fetch(`/api/events/${eventId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rsvpOpen }),
     });
     await load();
     setUpdating(null);
@@ -114,23 +126,38 @@ export default function EventsPage() {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  <span className={`badge ${RSVP_COLOR[myRsvp]}`}>{RSVP_LABEL[myRsvp]}</span>
-                  <div className="flex gap-1">
-                    {["GOING", "MAYBE", "DECLINED"].map((s) => (
-                      <button
-                        key={s}
-                        disabled={updating === ev.id}
-                        onClick={() => rsvp(ev.id, s)}
-                        className={`text-xs px-2 py-1 rounded-md border ${
-                          myRsvp === s
-                            ? "border-accent text-accent"
-                            : "border-border text-slate-400 hover:border-slate-500"
-                        }`}
-                      >
-                        {RSVP_LABEL[s]}
-                      </button>
-                    ))}
-                  </div>
+                  {ev.rsvpOpen ? (
+                    <>
+                      <span className={`badge ${RSVP_COLOR[myRsvp]}`}>{RSVP_LABEL[myRsvp]}</span>
+                      <div className="flex gap-1">
+                        {["GOING", "MAYBE", "DECLINED"].map((s) => (
+                          <button
+                            key={s}
+                            disabled={updating === ev.id}
+                            onClick={() => rsvp(ev.id, s)}
+                            className={`text-xs px-2 py-1 rounded-md border ${
+                              myRsvp === s
+                                ? "border-accent text-accent"
+                                : "border-border text-slate-400 hover:border-slate-500"
+                            }`}
+                          >
+                            {RSVP_LABEL[s]}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-xs text-slate-400">RSVPs open once teams are confirmed</span>
+                  )}
+                  {isAdmin && (
+                    <button
+                      disabled={updating === ev.id}
+                      onClick={() => setRsvpOpen(ev.id, !ev.rsvpOpen)}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      {ev.rsvpOpen ? "Close RSVPs" : "Open RSVPs"}
+                    </button>
+                  )}
                   {isAdmin && (
                     <div className="flex gap-2 mt-1">
                       <Link href={`/events/${ev.id}`} className="text-xs text-accent2 hover:underline">
