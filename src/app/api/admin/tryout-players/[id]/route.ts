@@ -17,6 +17,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const player = await prisma.tryoutPlayer.update({ where: { id: params.id }, data: parsed.data });
+  // The tracker link also belongs on the player's app profile, if they have one.
+  if (parsed.data.trackerUrl !== undefined && player.userId) {
+    await prisma.user.update({ where: { id: player.userId }, data: { rlTrackerUrl: player.trackerUrl } });
+  }
   return NextResponse.json(player);
 }
 

@@ -136,11 +136,7 @@ export default function AdminPage() {
                   {u.displayName || u.username} <span className="text-slate-500 font-normal">@{u.username}</span>
                 </p>
                 <p className="text-xs text-slate-500">{u.email}</p>
-                {u.rlTrackerUrl && (
-                  <a href={u.rlTrackerUrl} target="_blank" rel="noreferrer" className="text-xs text-accent2 hover:underline">
-                    RL Tracker profile
-                  </a>
-                )}
+                <TrackerField user={u} onSaved={load} />
               </div>
               <div className="flex items-center gap-2">
                 <select
@@ -206,11 +202,7 @@ export default function AdminPage() {
                   {u.role === "ADMIN" && <span className="badge bg-accent2/20 text-accent2 ml-1">Admin</span>}
                 </p>
                 <p className="text-xs text-slate-500">@{u.username} · {u.email}</p>
-                {u.rlTrackerUrl && (
-                  <a href={u.rlTrackerUrl} target="_blank" rel="noreferrer" className="text-xs text-accent2 hover:underline">
-                    RL Tracker profile
-                  </a>
-                )}
+                <TrackerField user={u} onSaved={load} />
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1">
@@ -291,6 +283,81 @@ export default function AdminPage() {
           </ul>
         </section>
       )}
+    </div>
+  );
+}
+
+// Shows the player's RL Tracker link with an inline field so admins can add or fix it.
+function TrackerField({ user, onSaved }: { user: UserRow; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(user.rlTrackerUrl ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rlTrackerUrl: value.trim() }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Couldn't save that link.");
+      return;
+    }
+    setEditing(false);
+    onSaved();
+  }
+
+  if (!editing) {
+    return (
+      <p className="text-xs">
+        {user.rlTrackerUrl ? (
+          <a href={user.rlTrackerUrl} target="_blank" rel="noreferrer" className="text-accent2 hover:underline">
+            RL Tracker profile
+          </a>
+        ) : (
+          <span className="text-slate-500">No tracker link</span>
+        )}
+        <button
+          className="text-slate-400 hover:underline ml-2"
+          onClick={() => {
+            setValue(user.rlTrackerUrl ?? "");
+            setEditing(true);
+          }}
+        >
+          {user.rlTrackerUrl ? "Edit" : "Add"}
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-1 space-y-1">
+      <div className="flex gap-2 items-center">
+        <input
+          className="input !py-1 text-xs w-72"
+          type="url"
+          autoFocus
+          placeholder="https://rocketleague.tracker.network/rocket-league/profile/..."
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setEditing(false);
+          }}
+        />
+        <button className="btn-primary !py-1 !px-2 text-xs" disabled={saving} onClick={save}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button className="text-slate-400 hover:underline text-xs" onClick={() => setEditing(false)}>
+          Cancel
+        </button>
+      </div>
+      {error && <p className="text-red-400 text-xs">{error}</p>}
     </div>
   );
 }

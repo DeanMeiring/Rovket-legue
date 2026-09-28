@@ -11,6 +11,7 @@ export type BoardPlayer = {
   rank2v2: number | null;
   rank3v3: number | null;
   notes: string | null;
+  trackerUrl?: string | null;
   userId: string | null;
   claimToken?: string | null;
   userStatus?: string | null; // status of the linked app account, if any
