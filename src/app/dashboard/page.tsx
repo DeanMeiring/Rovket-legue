@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, RSVP_COLOR, RSVP_LABEL } from "@/lib/format";
+import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, formatEventWhen, RSVP_COLOR, RSVP_LABEL } from "@/lib/format";
 import CompleteProfileModal from "@/components/CompleteProfileModal";
 
 export default async function DashboardPage() {
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   });
 
   const upcomingEvents = await prisma.event.findMany({
-    where: { startTime: { gte: new Date() } },
+    where: { OR: [{ startTime: { gte: new Date() } }, { endTime: { gte: new Date() } }] },
     orderBy: { startTime: "asc" },
     take: 5,
     include: {
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
                       <span className="font-medium">{ev.title}</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {format(ev.startTime, "EEE d MMM, HH:mm")}
+                      {ev.endTime ? formatEventWhen(ev.startTime, ev.endTime) : format(ev.startTime, "EEE d MMM, HH:mm")}
                     </p>
                   </div>
                   <span className={`badge ${RSVP_COLOR[rsvp]}`}>{RSVP_LABEL[rsvp]}</span>

@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { format, isPast } from "date-fns";
+import { format } from "date-fns";
 import {
   EVENT_TYPE_COLOR,
   EVENT_TYPE_LABEL,
+  eventIsOver,
+  formatEventWhen,
   RSVP_COLOR,
   RSVP_LABEL,
 } from "@/lib/format";
@@ -19,6 +21,7 @@ type EventItem = {
   description: string | null;
   location: string | null;
   startTime: string;
+  endTime: string | null;
   rsvps: Rsvp[];
   createdBy: { displayName: string | null; username: string };
 };
@@ -58,8 +61,8 @@ export default function EventsPage() {
     await load();
   }
 
-  const upcoming = events.filter((e) => !isPast(new Date(e.startTime)));
-  const past = events.filter((e) => isPast(new Date(e.startTime)));
+  const upcoming = events.filter((e) => !eventIsOver(e.startTime, e.endTime));
+  const past = events.filter((e) => eventIsOver(e.startTime, e.endTime));
 
   return (
     <div className="space-y-8">
@@ -99,7 +102,7 @@ export default function EventsPage() {
                     </Link>
                   </div>
                   <p className="text-sm text-slate-400 mt-1">
-                    {format(new Date(ev.startTime), "EEEE d MMM yyyy, HH:mm")}
+                    {formatEventWhen(ev.startTime, ev.endTime)}
                     {ev.location && ` · ${ev.location}`}
                   </p>
                   {ev.description && (

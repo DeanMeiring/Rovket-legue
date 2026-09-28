@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 const schema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
-  type: z.enum(["TRYOUT", "SCRIM", "MATCH", "PRACTICE", "MEETING", "OTHER"]).optional(),
+  type: z.enum(["TRYOUT", "SCRIM", "MATCH", "TOURNAMENT", "PRACTICE", "MEETING", "OTHER"]).optional(),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   location: z.string().trim().max(200).optional().or(z.literal("")),
   startTime: z.string().optional(),

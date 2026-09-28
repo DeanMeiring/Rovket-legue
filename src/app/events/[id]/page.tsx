@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { format } from "date-fns";
 import Link from "next/link";
 import {
   EVENT_TYPE_COLOR,
   EVENT_TYPE_LABEL,
+  formatEventWhen,
   RSVP_COLOR,
   RSVP_LABEL,
 } from "@/lib/format";
@@ -32,6 +32,7 @@ type EventDetail = {
   description: string | null;
   location: string | null;
   startTime: string;
+  endTime: string | null;
   rsvps: Rsvp[];
   performances: Performance[];
 };
@@ -144,7 +145,7 @@ export default function EventDetailPage() {
             </span>
             <h1 className="text-3xl font-bold mt-2">{event.title}</h1>
             <p className="text-slate-400 mt-1">
-              {format(new Date(event.startTime), "EEEE d MMM yyyy, HH:mm")}
+              {formatEventWhen(event.startTime, event.endTime)}
               {event.location && ` · ${event.location}`}
             </p>
           </div>

@@ -10,6 +10,7 @@ export type EventFormValues = {
   description: string;
   location: string;
   startTime: string;
+  endTime: string;
 };
 
 export default function EventForm({
@@ -29,6 +30,7 @@ export default function EventForm({
       description: "",
       location: "",
       startTime: "",
+      endTime: "",
     }
   );
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +42,12 @@ export default function EventForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    if (form.endTime && new Date(form.endTime) < new Date(form.startTime)) {
+      setError("The end has to be after the start.");
+      return;
+    }
+    setLoading(true);
 
     const url = mode === "edit" ? `/api/events/${eventId}` : "/api/events";
     const method = mode === "edit" ? "PATCH" : "POST";
@@ -52,6 +58,7 @@ export default function EventForm({
       body: JSON.stringify({
         ...form,
         startTime: new Date(form.startTime).toISOString(),
+        endTime: form.endTime ? new Date(form.endTime).toISOString() : "",
       }),
     });
 
@@ -99,7 +106,7 @@ export default function EventForm({
             </select>
           </div>
           <div>
-            <label className="label">Date &amp; time</label>
+            <label className="label">Starts</label>
             <input
               className="input"
               type="datetime-local"
@@ -109,12 +116,25 @@ export default function EventForm({
             />
           </div>
           <div>
+            <label className="label">Ends (optional)</label>
+            <input
+              className="input"
+              type="datetime-local"
+              value={form.endTime}
+              min={form.startTime || undefined}
+              onChange={(e) => update("endTime", e.target.value)}
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              For multi-day events like tournaments, set the last day here.
+            </p>
+          </div>
+          <div>
             <label className="label">Location / lobby info</label>
             <input
               className="input"
               value={form.location}
               onChange={(e) => update("location", e.target.value)}
-              placeholder="Private match code, Discord voice channel, etc."
+              placeholder="Venue address, private match code, Discord channel, etc."
             />
           </div>
           <div>
