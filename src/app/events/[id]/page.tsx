@@ -10,6 +10,7 @@ import {
   formatEventWhen,
   RSVP_COLOR,
   RSVP_LABEL,
+  audienceLabel,
 } from "@/lib/format";
 
 type PlayerRef = { id: string; displayName: string | null; username: string };
@@ -34,6 +35,8 @@ type EventDetail = {
   startTime: string;
   endTime: string | null;
   rsvpOpen: boolean;
+  forEveryone: boolean;
+  audienceTeams: { id: string; name: string }[];
   rsvps: Rsvp[];
   performances: Performance[];
 };
@@ -159,6 +162,7 @@ export default function EventDetailPage() {
               {formatEventWhen(event.startTime, event.endTime)}
               {event.location && ` · ${event.location}`}
             </p>
+            <p className="text-sm text-slate-500 mt-1">For: {audienceLabel(event)}</p>
           </div>
           {isAdmin && (
             <div className="flex gap-2">

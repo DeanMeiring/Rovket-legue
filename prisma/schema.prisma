@@ -77,6 +77,7 @@ model Team {
   name      String   @unique
   colorHex  String?
   members   User[]
+  events    Event[]  @relation("EventAudience")
   createdAt DateTime @default(now())
 }
 
@@ -97,6 +98,11 @@ model Event {
   // Players can only RSVP while this is on. Tournaments start closed until
   // the teams are confirmed.
   rsvpOpen Boolean @default(true)
+
+  // Who the event is for. Everyone, or only players in audienceTeams; only
+  // they see it, get its emails and get an RSVP.
+  forEveryone   Boolean @default(true)
+  audienceTeams Team[]  @relation("EventAudience")
 
   rsvps        EventRsvp[]
   performances Performance[]

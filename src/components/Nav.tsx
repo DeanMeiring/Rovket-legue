@@ -52,14 +52,14 @@ export default function Nav() {
             🚀 RL Team Hub
           </Link>
 
-          <nav className="hidden md:flex flex-wrap gap-1 flex-1">
+          <nav className="hidden lg:flex flex-wrap gap-1 flex-1">
             {allLinks.map((l) => (
               <Link key={l.href} href={l.href} className={linkClass(l.href)}>
                 {l.label}
               </Link>
             ))}
           </nav>
-          <div className="hidden md:flex items-center gap-3 text-sm">
+          <div className="hidden lg:flex items-center gap-3 text-sm">
             <span className="text-slate-400">
               {session.user.name} {isAdmin && <span className="badge bg-accent2/20 text-accent2 ml-1">Admin</span>}
             </span>
@@ -69,7 +69,7 @@ export default function Nav() {
           </div>
 
           <button
-            className="md:hidden ml-auto p-2 -mr-2 rounded-lg text-slate-200 hover:bg-panel2"
+            className="lg:hidden ml-auto p-2 -mr-2 rounded-lg text-slate-200 hover:bg-panel2"
             aria-label="Open menu"
             aria-expanded={open}
             onClick={() => setOpen(true)}
@@ -90,7 +90,7 @@ export default function Nav() {
       </header>
 
       {open && (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div className="lg:hidden fixed inset-0 z-50">
           <button className="absolute inset-0 bg-black/60" aria-label="Close menu" onClick={() => setOpen(false)} />
           <aside className="absolute right-0 top-0 h-full w-72 max-w-[85%] bg-panel border-l border-border p-4 flex flex-col gap-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-3">

@@ -50,3 +50,10 @@ export function formatEventWhen(start: Date | string, end?: Date | string | null
 export function eventIsOver(start: Date | string, end?: Date | string | null): boolean {
   return new Date(end ?? start).getTime() < Date.now();
 }
+
+// "Everyone" or the names of the teams an event is for.
+export function audienceLabel(event: { forEveryone: boolean; audienceTeams?: { name: string }[] }) {
+  if (event.forEveryone) return "Everyone";
+  const names = (event.audienceTeams ?? []).map((t) => t.name);
+  return names.length ? names.join(", ") : "No team";
+}

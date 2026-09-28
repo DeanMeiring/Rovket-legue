@@ -24,6 +24,8 @@ export default function EditEventPage() {
           location: event.location || "",
           startTime: format(new Date(event.startTime), "yyyy-MM-dd'T'HH:mm"),
           endTime: event.endTime ? format(new Date(event.endTime), "yyyy-MM-dd'T'HH:mm") : "",
+          forEveryone: event.forEveryone,
+          teamIds: event.audienceTeams.map((t: { id: string }) => t.id),
         });
       })
       .catch(() => setNotFound(true));

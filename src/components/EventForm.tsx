@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EVENT_TYPE_LABEL } from "@/lib/format";
 
@@ -11,6 +11,8 @@ export type EventFormValues = {
   location: string;
   startTime: string;
   endTime: string;
+  forEveryone: boolean;
+  teamIds: string[];
 };
 
 export default function EventForm({
@@ -31,8 +33,24 @@ export default function EventForm({
       location: "",
       startTime: "",
       endTime: "",
+      forEveryone: true,
+      teamIds: [],
     }
   );
+  const [teams, setTeams] = useState<{ id: string; name: string; members: unknown[] }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/teams")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setTeams);
+  }, []);
+
+  function toggleTeam(id: string) {
+    setForm((f) => ({
+      ...f,
+      teamIds: f.teamIds.includes(id) ? f.teamIds.filter((t) => t !== id) : [...f.teamIds, id],
+    }));
+  }
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +63,10 @@ export default function EventForm({
     setError(null);
     if (form.endTime && new Date(form.endTime) < new Date(form.startTime)) {
       setError("The end has to be after the start.");
+      return;
+    }
+    if (!form.forEveryone && form.teamIds.length === 0) {
+      setError("Pick at least one team, or choose Everyone.");
       return;
     }
     setLoading(true);
@@ -129,6 +151,38 @@ export default function EventForm({
             </p>
           </div>
           <div>
+            <label className="label">Who is this for?</label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  checked={form.forEveryone}
+                  onChange={() => setForm((f) => ({ ...f, forEveryone: true }))}
+                />
+                Everyone
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  checked={!form.forEveryone}
+                  onChange={() => setForm((f) => ({ ...f, forEveryone: false }))}
+                />
+                Only these teams
+              </label>
+              {!form.forEveryone && (
+                <div className="grid grid-cols-2 gap-2 pl-6">
+                  {teams.map((t) => (
+                    <label key={t.id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={form.teamIds.includes(t.id)} onChange={() => toggleTeam(t.id)} />
+                      {t.name} <span className="text-slate-500">({t.members.length})</span>
+                    </label>
+                  ))}
+                  {teams.length === 0 && <p className="text-slate-500 text-sm col-span-2">No teams yet.</p>}
+                </div>
+              )}
+            </div>
+          </div>
+          <div>
             <label className="label">Location / lobby info</label>
             <input
               className="input"
@@ -163,7 +217,9 @@ export default function EventForm({
           </div>
           {mode === "create" && (
             <p className="text-xs text-slate-500">
-              All approved players will get an email notification when this is created.
+              {form.forEveryone
+                ? "Everyone approved gets an email when this is created."
+                : "Only players in the chosen teams see this event and get the email."}
             </p>
           )}
         </form>

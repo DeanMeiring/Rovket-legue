@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, formatEventWhen, RSVP_COLOR, RSVP_LABEL } from "@/lib/format";
+import { visibleEventsWhere } from "@/lib/eventAudience";
 import CompleteProfileModal from "@/components/CompleteProfileModal";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
 
@@ -54,7 +55,12 @@ export default async function DashboardPage() {
   const teammates = dbUser?.team?.members.filter((m) => m.id !== user.id) ?? [];
 
   const upcomingEvents = await prisma.event.findMany({
-    where: { OR: [{ startTime: { gte: new Date() } }, { endTime: { gte: new Date() } }] },
+    where: {
+      AND: [
+        { OR: [{ startTime: { gte: new Date() } }, { endTime: { gte: new Date() } }] },
+        await visibleEventsWhere(user),
+      ],
+    },
     orderBy: { startTime: "asc" },
     take: 5,
     include: {

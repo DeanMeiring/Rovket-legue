@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
+import { audienceSchema, visibleEventsWhere } from "@/lib/eventAudience";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const user = await requireApprovedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const event = await prisma.event.findUnique({
-    where: { id: params.id },
+  const event = await prisma.event.findFirst({
+    where: { id: params.id, ...(await visibleEventsWhere(user)) },
     include: {
+      audienceTeams: { select: { id: true, name: true } },
       rsvps: {
         include: { user: { select: { id: true, displayName: true, username: true, teamId: true } } },
       },
@@ -32,6 +34,7 @@ const schema = z.object({
   startTime: z.string().optional(),
   endTime: z.string().optional().or(z.literal("")),
   rsvpOpen: z.boolean().optional(),
+  ...audienceSchema,
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -48,6 +51,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   const data = parsed.data;
+  if (data.forEveryone === false && !data.teamIds?.length) {
+    return NextResponse.json({ error: "Pick at least one team, or choose Everyone." }, { status: 400 });
+  }
   const event = await prisma.event.update({
     where: { id: params.id },
     data: {
@@ -58,6 +64,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       ...(data.startTime !== undefined && { startTime: new Date(data.startTime) }),
       ...(data.endTime !== undefined && { endTime: data.endTime ? new Date(data.endTime) : null }),
       ...(data.rsvpOpen !== undefined && { rsvpOpen: data.rsvpOpen }),
+      ...(data.forEveryone !== undefined && { forEveryone: data.forEveryone }),
+      ...(data.teamIds !== undefined && {
+        audienceTeams: { set: (data.forEveryone ? [] : data.teamIds).map((id) => ({ id })) },
+      }),
     },
   });
 
