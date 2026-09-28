@@ -132,6 +132,31 @@ export default function TryoutBoardPage() {
     });
   }
 
+  // Gets (or with renew, replaces) the player's private claim link and copies it.
+  async function copyInvite(p: BoardPlayer, renew = false) {
+    if (renew && !confirm(`Make a new link for ${p.tag}? The old one will stop working.`)) return;
+    setNotice(null);
+    setError(null);
+    const res = await fetch(`/api/admin/tryout-players/${p.id}/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ renew }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "Couldn't create the invite link.");
+      return;
+    }
+    const url = `${window.location.origin}/claim/${data.claimToken}`;
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+    } catch {}
+    setNotice(`${copied ? "Copied" : "Invite link"} for ${p.tag}: ${url}. Send it to them privately.`);
+    setPlayers((ps) => ps.map((x) => (x.id === p.id ? { ...x, claimToken: data.claimToken } : x)));
+  }
+
   async function remove(p: BoardPlayer) {
     if (!confirm(`Remove ${p.tag} from the tryout board?`)) return;
     await fetch(`/api/admin/tryout-players/${p.id}`, { method: "DELETE" });
@@ -192,7 +217,7 @@ export default function TryoutBoardPage() {
       </div>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
-      {notice && <p className="text-accent2 text-sm">{notice}</p>}
+      {notice && <p className="text-accent2 text-sm break-all">{notice}</p>}
       {loading && <p className="text-slate-500">Loading...</p>}
 
       {!loading && players.length === 0 && (
@@ -281,9 +306,19 @@ export default function TryoutBoardPage() {
                       <td className="py-2 pr-3">
                         <p className="font-medium">
                           {p.tag}
-                          {p.userId && (
+                          {p.userId && p.userStatus === "PENDING" && (
+                            <span className="badge bg-yellow-500/15 text-yellow-300 ml-2" title="Set up their account; approve them in Admin">
+                              awaiting approval
+                            </span>
+                          )}
+                          {p.userId && p.userStatus !== "PENDING" && (
                             <span className="badge bg-accent2/15 text-accent2 ml-2" title="Linked to an app account">
                               account
+                            </span>
+                          )}
+                          {!p.userId && p.claimToken && (
+                            <span className="badge bg-slate-500/20 text-slate-300 ml-2" title="Invite link created, not used yet">
+                              invited
                             </span>
                           )}
                         </p>
@@ -316,6 +351,22 @@ export default function TryoutBoardPage() {
                         </div>
                       </td>
                       <td className="py-2 whitespace-nowrap text-right">
+                        {!p.userId && (
+                          <>
+                            <button
+                              className="text-accent hover:underline text-xs mr-3"
+                              onClick={() => copyInvite(p)}
+                              title="Copy a private link where they set their email and password"
+                            >
+                              {p.claimToken ? "Copy invite" : "Invite link"}
+                            </button>
+                            {p.claimToken && (
+                              <button className="text-slate-400 hover:underline text-xs mr-3" onClick={() => copyInvite(p, true)}>
+                                New link
+                              </button>
+                            )}
+                          </>
+                        )}
                         <button className="text-accent2 hover:underline text-xs mr-3" onClick={() => startEdit(p)}>
                           Edit
                         </button>
