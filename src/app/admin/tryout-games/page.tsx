@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { preciseRankLabel } from "@/lib/ranks";
-import { ratingMap, WEIGHT_2V2, WEIGHT_3V3 } from "@/lib/tryoutGames";
+import { BALANCE_WARN_MMR, ratingMap, WEIGHT_2V2, WEIGHT_3V3 } from "@/lib/tryoutGames";
 import { summarize, StatRow } from "@/lib/tryoutStats";
 
 type Player = { id: string; tag: string; name: string | null; rank2v2: number | null; rank3v3: number | null };
@@ -127,6 +127,18 @@ export default function TryoutGamesPage() {
     await load();
   }
 
+  async function saveGame(game: Game, blueIds: string[], orangeIds: string[]): Promise<string | null> {
+    const res = await fetch(`/api/admin/tryout-games/${game.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blueIds, orangeIds }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return body.error || "Couldn't save that game.";
+    await load();
+    return null;
+  }
+
   async function evaluate() {
     setBusy("evaluate");
     setError(null);
@@ -172,10 +184,14 @@ export default function TryoutGamesPage() {
         <button className="btn-primary" onClick={generate} disabled={busy === "generate" || data.players.length < 6}>
           {busy === "generate" ? "Generating..." : data.games.length ? "Regenerate unplayed games" : "Generate games"}
         </button>
+        <a href="/api/admin/tryout-games/export" className="btn-secondary" aria-disabled={data.games.length === 0}>
+          Export to Excel
+        </a>
         <p className="text-xs text-slate-500 basis-full">
           {data.players.length} players on the board, so {Math.floor(data.players.length / 6)} game
           {Math.floor(data.players.length / 6) === 1 ? "" : "s"} can run at once. Regenerating keeps every game that
-          already has a replay. Add or remove players on the tryout board first.
+          already has a replay, and replaces hand edits on games without one. Add or remove players on the tryout
+          board first.
         </p>
       </section>
 
@@ -209,6 +225,11 @@ export default function TryoutGamesPage() {
                   onLink={(v) => setLinks((l) => ({ ...l, [g.id]: v }))}
                   onUpload={(file) => uploadReplay(g, file)}
                   onRefresh={() => refresh(g)}
+                  players={data.players}
+                  otherIdsThisRound={
+                    new Set(games.filter((o) => o.id !== g.id).flatMap((o) => [...o.blueIds, ...o.orangeIds]))
+                  }
+                  onSave={(blue, orange) => saveGame(g, blue, orange)}
                 />
               ))}
             </div>
@@ -304,6 +325,9 @@ function GameCard({
   onLink,
   onUpload,
   onRefresh,
+  players,
+  otherIdsThisRound,
+  onSave,
 }: {
   game: Game;
   tagOf: (id: string) => string;
@@ -314,12 +338,42 @@ function GameCard({
   onLink: (v: string) => void;
   onUpload: (file: File | null) => void;
   onRefresh: () => void;
+  players: Player[];
+  otherIdsThisRound: Set<string>;
+  onSave: (blueIds: string[], orangeIds: string[]) => Promise<string | null>;
 }) {
-  const blue = avg(game.blueIds);
-  const orange = avg(game.orangeIds);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ blue: game.blueIds, orange: game.orangeIds });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const sides = editing ? draft : { blue: game.blueIds, orange: game.orangeIds };
+  const blue = avg(sides.blue);
+  const orange = avg(sides.orange);
+  const gap = Math.abs(blue - orange);
+  const unbalanced = gap > BALANCE_WARN_MMR;
   const done = game.replayStatus === "ok";
+
+  const all = [...draft.blue, ...draft.orange];
+  const duplicates = new Set(all.filter((id, i) => all.indexOf(id) !== i));
+  const clashes = all.filter((id) => otherIdsThisRound.has(id));
+  const sortedPlayers = [...players].sort((a, b) => a.tag.localeCompare(b.tag));
+
+  function setSlot(side: "blue" | "orange", i: number, id: string) {
+    setDraft((d) => ({ ...d, [side]: d[side].map((x, j) => (j === i ? id : x)) }));
+  }
+
+  async function save() {
+    setSaving(true);
+    setSaveError(null);
+    const err = await onSave(draft.blue, draft.orange);
+    setSaving(false);
+    if (err) setSaveError(err);
+    else setEditing(false);
+  }
+
   return (
-    <div className="card !p-4 space-y-3">
+    <div className={`card !p-4 space-y-3 ${unbalanced && !done ? "!border-yellow-500/60" : ""}`}>
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="font-semibold">Game {game.number}</h3>
         {done ? (
@@ -327,26 +381,91 @@ function GameCard({
             {game.blueGoals} – {game.orangeGoals}
           </span>
         ) : (
-          <span className="text-xs text-slate-500">rating gap {Math.round(Math.abs(blue - orange))}</span>
+          <span className={`text-xs ${unbalanced ? "text-yellow-300 font-semibold" : "text-slate-500"}`}>
+            {unbalanced ? "Unbalanced · " : ""}rating gap {Math.round(gap)}
+          </span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm">
-        {[
-          { label: "Blue", ids: game.blueIds, avg: blue, color: "text-accent2" },
-          { label: "Orange", ids: game.orangeIds, avg: orange, color: "text-accent" },
-        ].map((s) => (
+        {([
+          { key: "blue", label: "Blue", avg: blue, color: "text-accent2" },
+          { key: "orange", label: "Orange", avg: orange, color: "text-accent" },
+        ] as const).map((s) => (
           <div key={s.label}>
             <p className={`text-xs font-semibold ${s.color}`}>
               {s.label} <span className="text-slate-500 font-normal">· {preciseRankLabel(Math.round(s.avg))}</span>
             </p>
-            <ul>
-              {s.ids.map((id) => (
-                <li key={id}>{tagOf(id)}</li>
-              ))}
-            </ul>
+            {editing ? (
+              <div className="space-y-1 mt-1">
+                {draft[s.key].map((id, i) => (
+                  <select
+                    key={i}
+                    className={`input !py-1 !px-2 text-xs ${duplicates.has(id) ? "!border-red-500" : ""}`}
+                    value={id}
+                    onChange={(e) => setSlot(s.key, i, e.target.value)}
+                  >
+                    {!players.some((p) => p.id === id) && <option value={id}>Removed player</option>}
+                    {sortedPlayers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.tag}
+                      </option>
+                    ))}
+                  </select>
+                ))}
+              </div>
+            ) : (
+              <ul>
+                {sides[s.key].map((id) => (
+                  <li key={id}>{tagOf(id)}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>
+
+      {editing && (
+        <div className="space-y-2 text-xs">
+          {unbalanced && (
+            <p className="text-yellow-300">
+              Sides are {Math.round(gap)} MMR apart on average. Generated games stay under {BALANCE_WARN_MMR}.
+            </p>
+          )}
+          {duplicates.size > 0 && <p className="text-red-400">A player is picked twice in this game.</p>}
+          {clashes.length > 0 && (
+            <p className="text-yellow-300">
+              Also playing another game this round: {[...new Set(clashes)].map(tagOf).join(", ")}.
+            </p>
+          )}
+          {saveError && <p className="text-red-400">{saveError}</p>}
+          <div className="flex gap-2">
+            <button className="btn-primary !py-1 !px-3 text-xs" onClick={save} disabled={saving || duplicates.size > 0}>
+              {saving ? "Saving..." : "Save game"}
+            </button>
+            <button
+              className="btn-secondary !py-1 !px-3 text-xs"
+              onClick={() => {
+                setEditing(false);
+                setSaveError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!editing && !game.ballchasingId && (
+        <button
+          className="text-xs text-accent2 hover:underline"
+          onClick={() => {
+            setDraft({ blue: game.blueIds, orange: game.orangeIds });
+            setEditing(true);
+          }}
+        >
+          Edit players
+        </button>
+      )}
 
       {done && game.ballchasingId && (
         <div className="flex gap-3 text-xs">
@@ -375,7 +494,7 @@ function GameCard({
         </div>
       )}
 
-      {!done && canUpload && (
+      {!done && canUpload && !editing && (
         <div className="space-y-2 border-t border-border/60 pt-3">
           <label className="block text-xs text-slate-400">
             Upload the .replay file

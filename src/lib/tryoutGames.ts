@@ -138,3 +138,15 @@ export function generateGames(
   }
   return games;
 }
+
+// A side-average gap above this (in MMR, about half a Champion sub-rank) is
+// flagged as unbalanced when a game is edited by hand.
+export const BALANCE_WARN_MMR = 50;
+
+export function sideAverage(ids: string[], rating: Map<string, number>): number {
+  return ids.length ? ids.reduce((s, id) => s + (rating.get(id) ?? 0), 0) / ids.length : 0;
+}
+
+export function balanceGap(game: GameSides, rating: Map<string, number>): number {
+  return Math.abs(sideAverage(game.blueIds, rating) - sideAverage(game.orangeIds, rating));
+}
