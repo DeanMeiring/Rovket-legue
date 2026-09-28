@@ -7,7 +7,7 @@ export type RatedPlayer = {
   rank3v3: number | null;
 };
 
-export type GameSides = { blueIds: string[]; orangeIds: string[] };
+export type GameSides = { blueIds: string[]; orangeIds: string[]; round?: number };
 
 export type GeneratedGame = GameSides & { number: number; round: number };
 
@@ -108,11 +108,18 @@ export function generateGames(
   const rating = ratingMap(players);
   const ids = players.map((p) => p.id);
   const plays = new Map(ids.map((id) => [id, 0]));
+  // Last round each player was in, so ties sit out whoever played most
+  // recently and nobody plays a long run and then waits a long time.
+  const last = new Map(ids.map((id) => [id, -1]));
   const pairs = new Map<string, number>();
 
   const record = (g: GameSides) => {
     for (const side of [g.blueIds, g.orangeIds]) {
-      side.forEach((id) => plays.has(id) && plays.set(id, plays.get(id)! + 1));
+      side.forEach((id) => {
+        if (!plays.has(id)) return;
+        plays.set(id, plays.get(id)! + 1);
+        last.set(id, g.round ?? 0);
+      });
       for (let x = 0; x < side.length; x++)
         for (let y = x + 1; y < side.length; y++) {
           const k = pairKey(side[x], side[y]);
@@ -130,7 +137,7 @@ export function generateGames(
     const n = Math.min(perRound, count - games.length);
     const playing = [...ids]
       .map((id) => ({ id, r: rnd() }))
-      .sort((a, b) => plays.get(a.id)! - plays.get(b.id)! || a.r - b.r)
+      .sort((a, b) => plays.get(a.id)! - plays.get(b.id)! || last.get(a.id)! - last.get(b.id)! || a.r - b.r)
       .slice(0, n * perGame)
       .map((x) => x.id);
 
