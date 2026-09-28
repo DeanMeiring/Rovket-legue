@@ -51,6 +51,7 @@ export default function EventRoster({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showPool, setShowPool] = useState(true);
+  const [showCounts, setShowCounts] = useState(true);
 
   async function load(resetForm = false) {
     const res = await fetch(`/api/events/${eventId}/roster`);
@@ -152,6 +153,9 @@ export default function EventRoster({
 
   const rounds = [...new Set(roster.games.map((g) => g.round))];
   const hasPlayed = roster.games.some((g) => g.played);
+  const counts = perPlayer(roster, rounds);
+  const fewest = Math.min(...counts.map((c) => c.total));
+  const most = Math.max(...counts.map((c) => c.total));
 
   return (
     <div className="card">
@@ -219,7 +223,9 @@ export default function EventRoster({
                     <span className="flex-1 min-w-0 truncate">{c.name}</span>
                     {!c.hasRank && <span className="text-xs text-slate-500">no rank</span>}
                     {roster.plays?.[c.id] ? (
-                      <span className="text-xs text-slate-400">{roster.plays[c.id]} played</span>
+                      <span className="text-xs text-slate-400">
+                        {roster.plays[c.id]} game{roster.plays[c.id] === 1 ? "" : "s"}
+                      </span>
                     ) : null}
                     <span
                       className={`badge whitespace-nowrap ${c.rsvp ? RSVP_COLOR[c.rsvp] : "bg-slate-700/40 text-slate-400"}`}
@@ -232,6 +238,46 @@ export default function EventRoster({
             </ul>
           )}
           {message && <p className="text-sm text-slate-300">{message}</p>}
+        </div>
+      )}
+
+      {counts.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowCounts((v) => !v)}
+            className="text-sm font-semibold text-slate-300 mb-2 hover:text-white"
+          >
+            Games per player {showCounts ? "▾" : "▸"}
+            <span className="font-normal text-slate-400">
+              {" "}
+              · {fewest === most ? `everyone plays ${most}` : `${fewest} to ${most} each`}
+            </span>
+          </button>
+          {showCounts && (
+            <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+              {counts.map((c) => (
+                <li key={c.id} className="flex items-center gap-2">
+                  <span className={`flex-1 min-w-0 truncate ${c.id === myId ? "font-bold text-white" : ""}`}>
+                    {c.name}
+                  </span>
+                  <span className="flex shrink-0 gap-0.5" title="One box per round: filled means playing">
+                    {c.strip.map((s, i) => (
+                      <span
+                        key={i}
+                        className={`w-2 h-3 rounded-sm ${
+                          s === "played" ? "bg-slate-500" : s === "playing" ? "bg-sky-400" : "border border-slate-700"
+                        }`}
+                      />
+                    ))}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap">
+                    {c.total} game{c.total === 1 ? "" : "s"}
+                    {c.played > 0 && ` (${c.played} done)`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -260,6 +306,32 @@ export default function EventRoster({
       )}
     </div>
   );
+}
+
+// Each player's game count plus one box per round (played, still to play, or
+// sitting out), so it's easy to see nobody plays a long run and then stops.
+function perPlayer(roster: Roster, rounds: number[]) {
+  const names = new Map<string, string>();
+  for (const g of roster.games) for (const p of [...g.blue, ...g.orange]) names.set(p.id, p.name);
+  for (const id of roster.pool ?? []) {
+    const c = roster.candidates?.find((x) => x.id === id);
+    if (c && !names.has(id)) names.set(id, c.name);
+  }
+  return [...names]
+    .map(([id, name]) => {
+      const mine = roster.games.filter((g) => [...g.blue, ...g.orange].some((p) => p.id === id));
+      return {
+        id,
+        name,
+        total: mine.length,
+        played: mine.filter((g) => g.played).length,
+        strip: rounds.map((r) => {
+          const g = mine.find((x) => x.round === r);
+          return g ? (g.played ? "played" : "playing") : "out";
+        }),
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 }
 
 function GameRow({
