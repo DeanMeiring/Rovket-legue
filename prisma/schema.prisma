@@ -22,6 +22,7 @@ enum EventType {
   TRYOUT
   SCRIM
   MATCH
+  TOURNAMENT
   PRACTICE
   MEETING
   OTHER

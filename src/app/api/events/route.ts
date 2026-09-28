@@ -7,7 +7,7 @@ import { format } from "date-fns";
 
 const schema = z.object({
   title: z.string().trim().min(1).max(120),
-  type: z.enum(["TRYOUT", "SCRIM", "MATCH", "PRACTICE", "MEETING", "OTHER"]),
+  type: z.enum(["TRYOUT", "SCRIM", "MATCH", "TOURNAMENT", "PRACTICE", "MEETING", "OTHER"]),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   location: z.string().trim().max(200).optional().or(z.literal("")),
   startTime: z.string().datetime().or(z.string().min(1)),
