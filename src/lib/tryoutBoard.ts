@@ -12,6 +12,8 @@ export type BoardPlayer = {
   rank3v3: number | null;
   notes: string | null;
   userId: string | null;
+  claimToken?: string | null;
+  userStatus?: string | null; // status of the linked app account, if any
 };
 
 // A bit over one sub-rank at Champion level (C1 ≈ 1041-1150). Higher ranks

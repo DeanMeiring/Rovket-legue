@@ -149,6 +149,10 @@ model TryoutPlayer {
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  // Private one-time link (/claim/<token>) the admin sends so this player can
+  // set up their own account. Cleared once it is used.
+  claimToken String? @unique
+
   gameStats TryoutGameStat[]
 
   createdAt DateTime @default(now())

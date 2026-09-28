@@ -7,8 +7,13 @@ export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const players = await prisma.tryoutPlayer.findMany({ orderBy: { createdAt: "asc" } });
-  return NextResponse.json(players);
+  const players = await prisma.tryoutPlayer.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { user: { select: { status: true } } },
+  });
+  return NextResponse.json(
+    players.map(({ user, ...p }) => ({ ...p, userStatus: user?.status ?? null }))
+  );
 }
 
 export async function POST(req: Request) {
