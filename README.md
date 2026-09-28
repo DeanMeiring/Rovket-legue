@@ -98,8 +98,11 @@ scratch, or to understand what's already there:
    `SMTP_*` / `EMAIL_FROM` vars once you have an email provider.
 4. Build command: `npm run build` (default). Start command: `npm run start:release` —
    this runs `prisma migrate deploy` (applies the schema) and the admin-seed script
-   before starting the server, so both happen automatically on every deploy. The seed
-   script no-ops once the admin user already exists.
+   before starting the server, so both happen automatically on every deploy. If the
+   admin user already exists, the seed script resets its password to `ADMIN_PASSWORD`
+   (when that variable is set), so to change the admin password, change the Railway
+   variable. A password changed inside the app for that account is overwritten on
+   the next deploy.
 5. Generate a public domain for the service and set `NEXTAUTH_URL` to it (must be set
    before the first real login attempt, since NextAuth uses it for callback URLs).
 
