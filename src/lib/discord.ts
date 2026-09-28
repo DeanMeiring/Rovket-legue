@@ -376,6 +376,14 @@ function sameDay(a: Date, b: Date) {
   return a.toDateString() === b.toDateString();
 }
 
+// The server's "Players" role, pinged on events for everyone. Found by name,
+// so renaming the role in Discord stops the ping until it's named back.
+async function playersRoleId(): Promise<string | null> {
+  const { guildId } = discordConfig();
+  const roles = await api<{ id: string; name: string }[]>("GET", `/guilds/${guildId}/roles`);
+  return roles.find((r) => r.name.trim().toLowerCase() === "players")?.id ?? null;
+}
+
 // Posts a new event: team events go to each team's own channel (pinging the
 // team role), events for everyone go to DISCORD_EVENTS_CHANNEL_ID.
 // resend swaps the earlier posts for fresh ones, so there's only ever one set
@@ -404,7 +412,10 @@ export async function announceEvent(
 
   const targets: { channelId: string; roleIds: string[] }[] = [];
   if (event.forEveryone) {
-    if (eventsChannelId) targets.push({ channelId: eventsChannelId, roleIds: [] });
+    if (eventsChannelId) {
+      const players = await playersRoleId();
+      targets.push({ channelId: eventsChannelId, roleIds: players ? [players] : [] });
+    }
   } else {
     const leftover: string[] = [];
     for (const t of teams) {
