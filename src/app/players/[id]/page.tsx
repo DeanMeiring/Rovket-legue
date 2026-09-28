@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
 import PreciseRankPicker from "@/components/PreciseRankPicker";
+import WeekSchedule from "@/components/WeekSchedule";
 
 type Performance = {
   id: string;
@@ -262,6 +263,8 @@ export default function PlayerProfilePage() {
           </form>
         )}
       </div>
+
+      <WeekSchedule playerId={player.id} isSelf={isSelf} />
 
       {isSelf && (
         <div className="card">

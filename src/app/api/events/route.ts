@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
-import { sendEmail } from "@/lib/email";
+import { escapeHtml, sendEmail } from "@/lib/email";
+import { rsvpEmailButtons } from "@/lib/rsvp";
 import { formatEventWhen } from "@/lib/format";
 import { audienceSchema, audienceUsersWhere, visibleEventsWhere } from "@/lib/eventAudience";
 
@@ -80,20 +81,19 @@ export async function POST(req: Request) {
   });
 
   for (const p of players) {
+    // Players get RSVP buttons; staff only hear about it.
+    const rsvpPart = !event.rsvpOpen
+      ? "<p>Teams are still being confirmed. You'll be able to RSVP once they are.</p>"
+      : p.isPlayer
+        ? rsvpEmailButtons(event.id, p.id)
+        : "";
     void sendEmail(
       p.email,
       `New ${type.toLowerCase()} scheduled: ${title}`,
-      `<p><strong>${title}</strong> has been scheduled for ${formatEventWhen(
-        startTime,
-        endTime || null
-      )}.</p>
-       ${location ? `<p>Location: ${location}</p>` : ""}
-       ${description ? `<p>${description}</p>` : ""}
-       <p>${
-         event.rsvpOpen
-           ? "Log in to the team hub to RSVP."
-           : "Teams are still being confirmed. You'll be able to RSVP once they are."
-       }</p>`
+      `<p><strong>${escapeHtml(title)}</strong> has been scheduled for ${formatEventWhen(startTime, endTime || null)}.</p>
+       ${location ? `<p>Location: ${escapeHtml(location)}</p>` : ""}
+       ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+       ${rsvpPart}`
     );
   }
 
