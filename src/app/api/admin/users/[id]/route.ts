@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { isMainAdmin, requireAdmin } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { quietly, syncMemberRoles } from "@/lib/discord";
 
 const schema = z.object({
   // Same rules as sign-up. Usernames are the login, so only a main admin changes them.
@@ -87,6 +88,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     data,
     include: { team: true },
   });
+
+  // Give or take away their team's Discord role.
+  if (user.teamId !== before.teamId || user.status !== before.status) {
+    void quietly("team role", () => syncMemberRoles(user.id));
+  }
 
   // Keep the tryout board's copy of the tracker link in step.
   if (data.rlTrackerUrl !== undefined) {

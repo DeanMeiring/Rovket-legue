@@ -4,9 +4,12 @@ export async function register() {
 
   const cron = await import("node-cron");
   const { sendEventReminders } = await import("@/lib/reminders");
+  const { quietly, sendDiscordReminders } = await import("@/lib/discord");
 
-  // Check every 15 minutes for events starting within the reminder window.
-  cron.schedule("*/15 * * * *", async () => {
+  // Check every 5 minutes for events starting within the reminder windows:
+  // emails a few hours ahead, the Discord ping about an hour ahead.
+  cron.schedule("*/5 * * * *", async () => {
+    await quietly("reminders", () => sendDiscordReminders());
     try {
       const count = await sendEventReminders();
       if (count > 0) console.log(`[reminders] Sent reminders for ${count} event(s).`);
@@ -15,5 +18,5 @@ export async function register() {
     }
   });
 
-  console.log("[reminders] Cron scheduler started (every 15 minutes).");
+  console.log("[reminders] Cron scheduler started (every 5 minutes).");
 }

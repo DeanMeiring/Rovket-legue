@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
 import { audienceSchema, visibleEventsWhere } from "@/lib/eventAudience";
+import { deleteEventMessages, quietly, refreshEventMessages } from "@/lib/discord";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const user = await requireApprovedUser();
@@ -71,6 +72,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     },
   });
 
+  void quietly("refresh event posts", () => refreshEventMessages(event.id));
+
   return NextResponse.json(event);
 }
 
@@ -78,6 +81,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await quietly("delete event posts", () => deleteEventMessages(params.id));
   await prisma.event.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }
