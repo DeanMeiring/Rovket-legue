@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
 import { escapeHtml, sendEmail } from "@/lib/email";
 import { rsvpEmailButtons } from "@/lib/rsvp";
+import { announceEvent, quietly } from "@/lib/discord";
 import { formatEventWhen } from "@/lib/format";
 import { audienceSchema, audienceUsersWhere, visibleEventsWhere } from "@/lib/eventAudience";
 
@@ -96,6 +97,8 @@ export async function POST(req: Request) {
        ${rsvpPart}`
     );
   }
+
+  void quietly("announce event", () => announceEvent(event.id));
 
   return NextResponse.json(event, { status: 201 });
 }

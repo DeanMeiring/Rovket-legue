@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
+import { quietly, syncMemberRoles } from "@/lib/discord";
 
 const schema = z.object({
   groups: z
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
     }
 
     results.push({ id: team.id, name: team.name, playerCount: group.playerIds.length });
+    for (const id of group.playerIds) void quietly("team role", () => syncMemberRoles(id));
   }
 
   return NextResponse.json({ teams: results });

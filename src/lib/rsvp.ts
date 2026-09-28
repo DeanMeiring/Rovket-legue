@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { quietly, refreshEventMessages, syncMemberRoles } from "@/lib/discord";
 
 export type RsvpChoice = "GOING" | "MAYBE" | "DECLINED";
 
@@ -11,6 +12,8 @@ export async function saveRsvp(eventId: string, eventType: string, userId: strin
     create: { eventId, userId, status },
   });
   if (eventType === "TRYOUT") await syncTryoutsTeam(userId, status);
+  // Update the counts on the event's Discord posts.
+  void quietly("refresh event posts", () => refreshEventMessages(eventId));
   return rsvp;
 }
 
@@ -35,6 +38,7 @@ async function syncTryoutsTeam(userId: string, status: string) {
       create: { name: TRYOUTS_TEAM },
     });
     await prisma.user.update({ where: { id: userId }, data: { teamId: team.id } });
+    void quietly("team role", () => syncMemberRoles(userId));
   } else if (status === "DECLINED" && current === TRYOUTS_TEAM) {
     const team = await prisma.team.upsert({
       where: { name: HOLDING_TEAM },
@@ -42,6 +46,7 @@ async function syncTryoutsTeam(userId: string, status: string) {
       create: { name: HOLDING_TEAM },
     });
     await prisma.user.update({ where: { id: userId }, data: { teamId: team.id } });
+    void quietly("team role", () => syncMemberRoles(userId));
   }
 }
 

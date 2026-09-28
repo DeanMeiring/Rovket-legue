@@ -15,6 +15,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       rlTrackerUrl: true,
       platform: true,
       discordTag: true,
+      discordUsername: true,
       bio: true,
       role: true,
       rank1v1: true,

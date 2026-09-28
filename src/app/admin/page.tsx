@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { preciseRankLabel } from "@/lib/ranks";
+import DiscordPanel from "@/components/DiscordPanel";
 
 type Team = { id: string; name: string; colorHex: string | null; members: { id: string }[] };
 type UserRow = {
@@ -233,6 +234,8 @@ export default function AdminPage() {
           {teams.length === 0 && <p className="text-slate-500 text-sm">No teams yet.</p>}
         </ul>
       </section>
+
+      <DiscordPanel />
 
       <section className="card">
         <h2 className="font-bold text-lg mb-4">Approved players ({approved.length})</h2>

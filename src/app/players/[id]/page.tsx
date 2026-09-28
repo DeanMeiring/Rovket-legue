@@ -29,6 +29,7 @@ type Player = {
   rlTrackerUrl: string | null;
   platform: string | null;
   discordTag: string | null;
+  discordUsername: string | null;
   bio: string | null;
   role: string;
   rank1v1: number | null;
@@ -108,6 +109,12 @@ export default function PlayerProfilePage() {
     await load();
     setSaving(false);
     setEditing(false);
+  }
+
+  async function unlinkDiscord() {
+    if (!confirm("Unlink your Discord? You'll lose your team role there.")) return;
+    await fetch("/api/profile/discord", { method: "DELETE" });
+    await load();
   }
 
   async function changePassword(e: React.FormEvent) {
@@ -190,7 +197,26 @@ export default function PlayerProfilePage() {
               </p>
             )}
             {player.platform && <p>🎮 Platform: {player.platform}</p>}
-            {player.discordTag && <p>💬 Discord: {player.discordTag}</p>}
+            {player.discordUsername ? (
+              <p>
+                💬 Discord: {player.discordUsername} <span className="badge bg-green-500/20 text-green-300 ml-1">Linked</span>
+                {isSelf && (
+                  <button onClick={unlinkDiscord} className="text-xs text-slate-500 hover:underline ml-2">
+                    Unlink
+                  </button>
+                )}
+              </p>
+            ) : (
+              <>
+                {player.discordTag && <p>💬 Discord: {player.discordTag}</p>}
+                {isSelf && (
+                  <p className="text-slate-500">
+                    🔗 Type <code className="text-slate-300">/link</code> in the BC Discord to RSVP from there and get
+                    your team role.
+                  </p>
+                )}
+              </>
+            )}
             {(player.rank1v1 || player.rank2v2 || player.rank3v3) && (
               <p>
                 🏅 Ranks:{" "}

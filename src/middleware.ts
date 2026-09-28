@@ -30,5 +30,6 @@ export const config = {
     "/performance/:path*",
     "/availability/:path*",
     "/admin/:path*",
+    "/discord/:path*",
   ],
 };
