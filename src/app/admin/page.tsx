@@ -109,6 +109,9 @@ export default function AdminPage() {
           <Link href="/admin/tryout-board" className="btn-secondary">
             📋 Tryout board
           </Link>
+          <Link href="/admin/availability" className="btn-secondary">
+            🗓️ Availability
+          </Link>
           <Link href="/admin/balance-teams" className="btn-secondary">
             ⚖️ Balance tryout teams
           </Link>

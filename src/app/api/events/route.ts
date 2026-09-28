@@ -52,6 +52,7 @@ export async function POST(req: Request) {
       location: location || null,
       startTime: new Date(startTime),
       endTime: endTime ? new Date(endTime) : null,
+      rsvpOpen: type !== "TOURNAMENT",
       createdById: admin.id,
     },
   });
@@ -76,7 +77,11 @@ export async function POST(req: Request) {
       )}.</p>
        ${location ? `<p>Location: ${location}</p>` : ""}
        ${description ? `<p>${description}</p>` : ""}
-       <p>Log in to the team hub to RSVP.</p>`
+       <p>${
+         event.rsvpOpen
+           ? "Log in to the team hub to RSVP."
+           : "Teams are still being confirmed. You'll be able to RSVP once they are."
+       }</p>`
     );
   }
 
