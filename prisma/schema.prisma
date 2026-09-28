@@ -70,6 +70,8 @@ model User {
   rsvps         EventRsvp[]
   performances  Performance[]
   tryoutEntry   TryoutPlayer?
+  aliases       PlayerAlias[]
+  reviews       PlayerReview[]
   availability  PlayerAvailability?
 
   createdAt DateTime @default(now())
@@ -120,6 +122,8 @@ model Event {
 
   rsvps           EventRsvp[]
   performances    Performance[]
+  pendingStats    PendingPerformance[]
+  replays         EventReplay[]
   discordMessages EventDiscordMessage[]
 
   // Game roster for the session: who is playing (user ids), how many games,
@@ -298,4 +302,70 @@ model EventGame {
   updatedAt DateTime @updatedAt
 
   @@unique([eventId, number])
+}
+
+// Replay stats for an in-game name that didn't match any account, waiting for
+// an admin to say who it is.
+model PendingPerformance {
+  id         String  @id @default(cuid())
+  eventId    String
+  event      Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  replayId   String
+  playerName String
+  goals      Int     @default(0)
+  assists    Int     @default(0)
+  saves      Int     @default(0)
+  shots      Int     @default(0)
+  score      Int     @default(0)
+  mvp        Boolean @default(false)
+  win        Boolean?
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, replayId, playerName])
+}
+
+// An in-game name an admin matched to an account, used by later imports.
+model PlayerAlias {
+  id     String @id @default(cuid())
+  name   String @unique // lowercased
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// Ballchasing replays already imported into an event.
+model EventReplay {
+  id       String @id @default(cuid())
+  eventId  String
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  replayId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, replayId])
+}
+
+// AI-written review of one player. Players only see it once published.
+model PlayerReview {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  model     String
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Research on how pro Rocket League players play and how coaches assess them,
+// written once and reused by every player review.
+model CoachingBrief {
+  id        String   @id @default(cuid())
+  text      String
+  model     String
+  createdAt DateTime @default(now())
 }
