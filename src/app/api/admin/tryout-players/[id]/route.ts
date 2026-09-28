@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { tryoutPlayerSchema } from "@/lib/tryoutSchema";
+import { copyBoardRanksToAccount } from "@/lib/rankSync";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
@@ -20,6 +21,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // The tracker link also belongs on the player's app profile, if they have one.
   if (parsed.data.trackerUrl !== undefined && player.userId) {
     await prisma.user.update({ where: { id: player.userId }, data: { rlTrackerUrl: player.trackerUrl } });
+  }
+  if (parsed.data.rank2v2 !== undefined || parsed.data.rank3v3 !== undefined) {
+    await copyBoardRanksToAccount(player.userId, player);
   }
   return NextResponse.json(player);
 }

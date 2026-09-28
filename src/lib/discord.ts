@@ -142,7 +142,8 @@ const CONNECT = 1 << 20;
 const SPEAK = 1 << 21;
 const TEAM_ALLOW = String(VIEW_CHANNEL | SEND_MESSAGES | READ_MESSAGE_HISTORY | CONNECT | SPEAK);
 
-const CATEGORY_NAME = "Team channels";
+// Where the first version put every team's channels. Removed once it's empty.
+const OLD_SHARED_CATEGORY = "Team channels";
 
 function slug(name: string) {
   return (
@@ -153,16 +154,10 @@ function slug(name: string) {
   );
 }
 
-async function teamCategoryId(channels: DiscordChannel[]): Promise<string> {
-  const { guildId } = discordConfig();
-  const existing = channels.find((c) => c.type === 4 && c.name.toLowerCase() === CATEGORY_NAME.toLowerCase());
-  if (existing) return existing.id;
-  const created = await api<DiscordChannel>("POST", `/guilds/${guildId}/channels`, { name: CATEGORY_NAME, type: 4 });
-  return created.id;
-}
-
-// Makes sure a team has its role plus a text and voice channel only that role
-// (and server admins) can see. Safe to run again: it only creates what's missing.
+// Makes sure a team has its role plus its own private category holding a text
+// and a voice channel that only that role (and server admins) can see. Safe to
+// run again: it only creates what's missing, and moves channels made by the
+// first version into the team's category.
 export async function ensureTeamDiscord(teamId: string) {
   const { guildId, applicationId } = discordConfig();
   const team = await prisma.team.findUnique({ where: { id: teamId } });
@@ -187,35 +182,43 @@ export async function ensureTeamDiscord(teamId: string) {
     { id: roleId, type: 0, allow: TEAM_ALLOW, deny: "0" },
     { id: applicationId, type: 1, allow: TEAM_ALLOW, deny: "0" },
   ];
-  const has = (id: string | null) => !!id && channels.some((c) => c.id === id);
+  const find = (id: string | null) => (id ? channels.find((c) => c.id === id) : undefined);
 
-  let textId = has(team.discordTextChannelId) ? team.discordTextChannelId : null;
-  let voiceId = has(team.discordVoiceChannelId) ? team.discordVoiceChannelId : null;
-  if (!textId || !voiceId) {
-    const parentId = await teamCategoryId(channels);
-    if (!textId) {
-      const c = await api<DiscordChannel>("POST", `/guilds/${guildId}/channels`, {
-        name: slug(team.name),
-        type: 0,
-        parent_id: parentId,
-        permission_overwrites: overwrites,
-      });
-      textId = c.id;
-    }
-    if (!voiceId) {
-      const c = await api<DiscordChannel>("POST", `/guilds/${guildId}/channels`, {
-        name: team.name,
-        type: 2,
-        parent_id: parentId,
-        permission_overwrites: overwrites,
-      });
-      voiceId = c.id;
-    }
+  let categoryId = find(team.discordCategoryId)?.id ?? null;
+  if (!categoryId) {
+    const c = await api<DiscordChannel>("POST", `/guilds/${guildId}/channels`, {
+      name: team.name,
+      type: 4,
+      permission_overwrites: overwrites,
+    });
+    categoryId = c.id;
   }
+
+  const ensureChannel = async (existing: DiscordChannel | undefined, name: string, type: number) => {
+    if (!existing) {
+      const c = await api<DiscordChannel>("POST", `/guilds/${guildId}/channels`, {
+        name,
+        type,
+        parent_id: categoryId,
+        permission_overwrites: overwrites,
+      });
+      return c.id;
+    }
+    if (existing.parent_id !== categoryId)
+      await api("PATCH", `/channels/${existing.id}`, { parent_id: categoryId, permission_overwrites: overwrites });
+    return existing.id;
+  };
+  const textId = await ensureChannel(find(team.discordTextChannelId), slug(team.name), 0);
+  const voiceId = await ensureChannel(find(team.discordVoiceChannelId), team.name, 2);
 
   await prisma.team.update({
     where: { id: team.id },
-    data: { discordRoleId: roleId, discordTextChannelId: textId, discordVoiceChannelId: voiceId },
+    data: {
+      discordRoleId: roleId,
+      discordCategoryId: categoryId,
+      discordTextChannelId: textId,
+      discordVoiceChannelId: voiceId,
+    },
   });
 
   // Everyone already on the team gets the new role.
@@ -224,6 +227,58 @@ export async function ensureTeamDiscord(teamId: string) {
     select: { id: true },
   });
   for (const m of members) await syncMemberRoles(m.id);
+}
+
+// Moves the team roles up to just under the bot's own role, so a player shows
+// under their team in the member list and takes its colour, even when they
+// also have other roles. "Team <number>" roles go first in number order, then
+// the rest by name. Discord only lets the bot move roles below its own, so the
+// bot's role has to sit near the top of the list for this to work.
+export async function positionTeamRoles() {
+  const { guildId, applicationId } = discordConfig();
+  const teams = await prisma.team.findMany({
+    where: { discordRoleId: { not: null } },
+    select: { name: true, discordRoleId: true },
+  });
+  const teamNumber = (name: string) => {
+    const m = name.match(/^team\s*(\d+)$/i);
+    return m ? Number(m[1]) : Infinity;
+  };
+  teams.sort(
+    (a, b) => teamNumber(a.name) - teamNumber(b.name) || a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
+  const teamRoleIds = teams.map((t) => t.discordRoleId!);
+
+  const [roles, me] = await Promise.all([
+    api<{ id: string; position: number }[]>("GET", `/guilds/${guildId}/roles`),
+    api<{ roles: string[] }>("GET", `/guilds/${guildId}/members/${applicationId}`),
+  ]);
+  const botTop = Math.max(0, ...roles.filter((r) => me.roles.includes(r.id)).map((r) => r.position));
+  // Every role the bot may move, highest first, with @everyone (position 0) left out.
+  const movable = roles
+    .filter((r) => r.position > 0 && r.position < botTop)
+    .sort((a, b) => b.position - a.position)
+    .map((r) => r.id);
+  const inTeamOrder = teamRoleIds.filter((id) => movable.includes(id));
+  if (!inTeamOrder.length) return;
+  const order = [...inTeamOrder, ...movable.filter((id) => !inTeamOrder.includes(id))];
+  if (order.every((id, i) => id === movable[i])) return;
+  await api(
+    "PATCH",
+    `/guilds/${guildId}/roles`,
+    order.map((id, i) => ({ id, position: botTop - 1 - i })),
+  );
+}
+
+// Deletes the shared "Team channels" category from the first version once
+// every team's channels have moved out of it. Leaves it alone if anything is
+// still inside.
+export async function removeOldSharedCategory() {
+  const { guildId } = discordConfig();
+  const channels = await api<DiscordChannel[]>("GET", `/guilds/${guildId}/channels`);
+  const old = channels.find((c) => c.type === 4 && c.name.toLowerCase() === OLD_SHARED_CATEGORY.toLowerCase());
+  if (!old || channels.some((c) => c.parent_id === old.id)) return;
+  await api("DELETE", `/channels/${old.id}`);
 }
 
 // Gives a linked player the Discord role of their team and takes away the

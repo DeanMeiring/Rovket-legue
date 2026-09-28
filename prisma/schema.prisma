@@ -83,8 +83,9 @@ model Team {
   id                    String   @id @default(cuid())
   name                  String   @unique
   colorHex              String?
-  // The team's Discord role and its private text and voice channels, made by the bot.
+  // The team's Discord role and its private category with text and voice channels, made by the bot.
   discordRoleId         String?
+  discordCategoryId     String?
   discordTextChannelId  String?
   discordVoiceChannelId String?
   members               User[]
