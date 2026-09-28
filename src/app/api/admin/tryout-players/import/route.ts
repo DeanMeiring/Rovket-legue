@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { STARTER_ROSTER } from "@/lib/tryoutBoard";
+import { copyBoardRanksToAccount } from "@/lib/rankSync";
 
 const schema = z.object({ source: z.enum(["starter", "signups"]) });
 
@@ -31,16 +32,21 @@ export async function POST(req: Request) {
   });
   const unlinked = await prisma.tryoutPlayer.findMany({ where: { userId: null } });
 
-  // Someone already on the board by gamertag gets linked to their account
-  // (keeping the board's ranks); other players are added as new. Admin
-  // accounts are only linked, so the seeded admin login doesn't show up.
+  // Someone already on the board by gamertag gets linked to their account.
+  // Ranks on the account win, and the board fills any the account is missing.
+  // Other players are added as new. Admin accounts are only linked, so the
+  // seeded admin login doesn't show up.
   let added = 0;
   let linked = 0;
   for (const u of users) {
     const tag = u.username.trim().toLowerCase();
     const match = unlinked.find((p) => p.tag.trim().toLowerCase() === tag);
     if (match) {
-      await prisma.tryoutPlayer.update({ where: { id: match.id }, data: { userId: u.id } });
+      const board = await prisma.tryoutPlayer.update({
+        where: { id: match.id },
+        data: { userId: u.id, rank2v2: u.rank2v2 ?? match.rank2v2, rank3v3: u.rank3v3 ?? match.rank3v3 },
+      });
+      await copyBoardRanksToAccount(u.id, board);
       unlinked.splice(unlinked.indexOf(match), 1);
       linked++;
     } else if (u.role !== "ADMIN") {

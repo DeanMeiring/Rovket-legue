@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireApprovedUser } from "@/lib/session";
 import { RANKS } from "@/lib/ranks";
+import { copyAccountRanksToBoard } from "@/lib/rankSync";
 
 const rankField = z
   .enum(RANKS.map((r) => r.label) as [string, ...string[]])
@@ -63,6 +64,9 @@ export async function PATCH(req: Request) {
       ...(data.profileCompleted !== undefined && { profileCompleted: data.profileCompleted }),
     },
   });
+
+  // Tryout games are balanced from the board, so it follows rank changes here.
+  await copyAccountRanksToBoard(updated.id, updated);
 
   return NextResponse.json(updated);
 }

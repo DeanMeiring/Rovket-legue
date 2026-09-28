@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isMainAdmin, requireAdmin } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { quietly, syncMemberRoles } from "@/lib/discord";
+import { copyAccountRanksToBoard } from "@/lib/rankSync";
 
 const schema = z.object({
   // Same rules as sign-up. Usernames are the login, so only a main admin changes them.
@@ -92,6 +93,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // Give or take away their team's Discord role.
   if (user.teamId !== before.teamId || user.status !== before.status) {
     void quietly("team role", () => syncMemberRoles(user.id));
+  }
+
+  // Tryout games are balanced from the board, so it follows rank changes here.
+  if (data.rank2v2 !== undefined || data.rank3v3 !== undefined) {
+    await copyAccountRanksToBoard(user.id, user);
   }
 
   // Keep the tryout board's copy of the tracker link in step.
