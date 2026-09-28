@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { balanceIntoTeams } from "@/lib/teamBalance";
 import { PLAYLISTS } from "@/lib/ranks";
+import { nameWithTag } from "@/lib/format";
 
 type PlayerRow = {
   id: string;
@@ -170,7 +171,7 @@ export default function BalanceTeamsPage() {
                   checked={!!selected[p.id]}
                   onChange={() => toggle(p.id)}
                 />
-                {p.displayName || p.username}
+                {nameWithTag(p)}
               </label>
               <span className="text-slate-500">
                 {p[format] != null ? p[format] : "no rating"}
@@ -207,7 +208,7 @@ export default function BalanceTeamsPage() {
                   <ul className="space-y-1 text-sm text-slate-300">
                     {g.map((p) => (
                       <li key={p.id} className="flex justify-between">
-                        <span>{p.displayName || p.username}</span>
+                        <span>{nameWithTag(p)}</span>
                         <span className="text-slate-500">{p[format] ?? "—"}</span>
                       </li>
                     ))}

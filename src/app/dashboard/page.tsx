@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, formatEventWhen, RSVP_COLOR, RSVP_LABEL } from "@/lib/format";
+import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, formatEventWhen, RSVP_COLOR, RSVP_LABEL, nameWithTag } from "@/lib/format";
 import { visibleEventsWhere } from "@/lib/eventAudience";
 import CompleteProfileModal from "@/components/CompleteProfileModal";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
@@ -115,7 +115,7 @@ export default async function DashboardPage() {
                   {teammates.map((m) => (
                     <li key={m.id} className="flex items-center justify-between">
                       <Link href={`/players/${m.id}`} className="hover:underline">
-                        {m.displayName || m.username}
+                        {nameWithTag(m)}
                       </Link>
                       <span className="text-slate-400">{preciseRankLabel(m.rank3v3) ?? "No rank set"}</span>
                     </li>
