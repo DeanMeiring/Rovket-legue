@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { BallchasingReplay, fetchReplay, listGroupReplays, parseBallchasingLink } from "@/lib/ballchasing";
@@ -49,6 +50,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       })
     ).map((r) => r.replayId),
   );
+  // Games imported before the detailed stats were kept get fetched again once
+  // to fill them in.
+  const missingStats = await prisma.performance.findMany({
+    where: { eventId: event.id, replayId: { in: replayIds }, stats: { equals: Prisma.DbNull } },
+    select: { replayId: true },
+    distinct: ["replayId"],
+  });
+  const refill = new Set<string>();
+  for (const m of missingStats) {
+    if (m.replayId && done.delete(m.replayId)) refill.add(m.replayId);
+  }
 
   const users = await prisma.user.findMany({
     where: { status: "APPROVED", isPlayer: true },
@@ -125,9 +137,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           score: core.score ?? 0,
           mvp: !!core.mvp,
           win: team.won,
+          stats: p.stats as object,
         };
         const user = findUser(p.name);
         if (!user) {
+          // A refill doesn't ask again about names already dealt with.
+          if (refill.has(replayId)) continue;
           unmatched.add(p.name);
           pending.push({ ...stats, playerName: p.name.trim() });
           continue;
@@ -139,8 +154,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // Unmatched names are kept so an admin can say who they are afterwards.
     await prisma.$transaction([
       prisma.performance.createMany({ data: rows, skipDuplicates: true }),
+      // Fills in detailed stats on rows that were imported without them.
+      ...rows.map((r) =>
+        prisma.performance.updateMany({
+          where: { eventId: event.id, replayId, userId: r.userId, stats: { equals: Prisma.DbNull } },
+          data: { stats: r.stats },
+        }),
+      ),
       prisma.pendingPerformance.createMany({ data: pending, skipDuplicates: true }),
-      prisma.eventReplay.create({ data: { eventId: event.id, replayId } }),
+      prisma.eventReplay.createMany({ data: [{ eventId: event.id, replayId }], skipDuplicates: true }),
     ]);
     games++;
   }
