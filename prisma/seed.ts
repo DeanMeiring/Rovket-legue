@@ -4,6 +4,13 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  await syncAdmin();
+  // The ADMIN_USERNAME account is always a main admin.
+  const username = process.env.ADMIN_USERNAME || "admin";
+  await prisma.user.updateMany({ where: { username }, data: { isMainAdmin: true } });
+}
+
+async function syncAdmin() {
   const username = process.env.ADMIN_USERNAME || "admin";
   const email = process.env.ADMIN_EMAIL || "admin@example.com";
   const password = process.env.ADMIN_PASSWORD || "change-me-now";

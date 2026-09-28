@@ -14,7 +14,7 @@ export async function GET() {
     include: { team: true },
   });
 
-  return NextResponse.json(users);
+  return NextResponse.json(users.map(({ passwordHash: _, ...u }) => u));
 }
 
 // Creates an approved admin account straight away.
