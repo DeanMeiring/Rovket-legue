@@ -49,12 +49,23 @@ function apiKeyOrThrow(): string {
   return apiKey;
 }
 
+// Optional BALLCHASING_GROUP_ID puts uploads in that ballchasing group. Accepts
+// the bare id or the whole group link, e.g. https://ballchasing.com/group/tryouts-a1b2c3
+function groupId(): string | null {
+  const raw = process.env.BALLCHASING_GROUP_ID?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/+$/, "").split("/").pop() || null;
+}
+
 // Uploads a .replay file and returns its ballchasing id. A replay that was
 // already uploaded (409) returns the existing id, so re-uploading is harmless.
 export async function uploadReplay(file: Blob, filename: string): Promise<string> {
   const form = new FormData();
   form.append("file", file, filename);
-  const res = await fetch("https://ballchasing.com/api/v2/upload?visibility=private", {
+  const params = new URLSearchParams({ visibility: "private" });
+  const group = groupId();
+  if (group) params.set("group", group);
+  const res = await fetch(`https://ballchasing.com/api/v2/upload?${params}`, {
     method: "POST",
     headers: { Authorization: apiKeyOrThrow() },
     body: form,
