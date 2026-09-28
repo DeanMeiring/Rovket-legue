@@ -145,6 +145,7 @@ model TryoutPlayer {
   rank2v2     Int?
   rank3v3     Int?
   notes       String?
+  trackerUrl  String?
 
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)

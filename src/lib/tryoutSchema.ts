@@ -8,4 +8,5 @@ export const tryoutPlayerSchema = z.object({
   rank2v2: z.number().int().min(0).max(3000).nullable().optional(),
   rank3v3: z.number().int().min(0).max(3000).nullable().optional(),
   notes: z.string().trim().max(500).nullable().optional(),
+  trackerUrl: z.string().trim().url("Enter a full link, starting with https://").max(300).nullable().optional(),
 });

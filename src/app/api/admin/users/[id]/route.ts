@@ -8,7 +8,14 @@ const schema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
   role: z.enum(["ADMIN", "PLAYER"]).optional(),
   teamId: z.string().nullable().optional(),
-  rlTrackerUrl: z.string().trim().optional().nullable(),
+  rlTrackerUrl: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((v) => v === "" || /^https?:\/\/\S+$/.test(v), "Enter a full link, starting with https://")
+    .transform((v) => v || null)
+    .optional()
+    .nullable(),
   rank1v1: z.number().int().min(0).max(3000).nullable().optional(),
   rank2v2: z.number().int().min(0).max(3000).nullable().optional(),
   rank3v3: z.number().int().min(0).max(3000).nullable().optional(),
@@ -21,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input." }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input." }, { status: 400 });
   }
 
   const before = await prisma.user.findUnique({ where: { id: params.id } });
@@ -46,6 +53,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     data,
     include: { team: true },
   });
+
+  // Keep the tryout board's copy of the tracker link in step.
+  if (data.rlTrackerUrl !== undefined) {
+    await prisma.tryoutPlayer.updateMany({ where: { userId: user.id }, data: { trackerUrl: user.rlTrackerUrl } });
+  }
 
   if (isNewlyApproved) {
     void sendEmail(

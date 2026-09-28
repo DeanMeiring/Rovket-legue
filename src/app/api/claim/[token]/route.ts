@@ -59,6 +59,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
         displayName,
         rank2v2: player.rank2v2,
         rank3v3: player.rank3v3,
+        rlTrackerUrl: player.trackerUrl,
         role: "PLAYER",
         status: "PENDING",
       },

@@ -40,9 +40,10 @@ type Draft = {
   rank3v3: number | null;
   rank2v2: number | null;
   notes: string;
+  trackerUrl: string;
 };
 
-const EMPTY_DRAFT: Draft = { tag: "", name: "", currentTeam: 0, rank3v3: null, rank2v2: null, notes: "" };
+const EMPTY_DRAFT: Draft = { tag: "", name: "", currentTeam: 0, rank3v3: null, rank2v2: null, notes: "", trackerUrl: "" };
 
 function rankText(v: number | null) {
   return preciseRankLabel(v) ?? "—";
@@ -93,6 +94,7 @@ export default function TryoutBoardPage() {
       rank3v3: draft.rank3v3,
       rank2v2: draft.rank2v2,
       notes: draft.notes.trim() || null,
+      trackerUrl: draft.trackerUrl.trim() || null,
     };
     const res = await fetch(editingId ? `/api/admin/tryout-players/${editingId}` : "/api/admin/tryout-players", {
       method: editingId ? "PATCH" : "POST",
@@ -119,6 +121,7 @@ export default function TryoutBoardPage() {
       rank3v3: p.rank3v3,
       rank2v2: p.rank2v2,
       notes: p.notes ?? "",
+      trackerUrl: p.trackerUrl ?? "",
     });
     document.getElementById("player-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -324,6 +327,16 @@ export default function TryoutBoardPage() {
                         </p>
                         {p.name && <p className="text-xs text-slate-500">{p.name}</p>}
                         {p.notes && <p className="text-xs text-slate-400 mt-0.5">{p.notes}</p>}
+                        {p.trackerUrl && (
+                          <a
+                            href={p.trackerUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-accent2 hover:underline"
+                          >
+                            RL Tracker
+                          </a>
+                        )}
                       </td>
                       <td className="py-2 pr-3">
                         <select
@@ -424,6 +437,19 @@ export default function TryoutBoardPage() {
               <label className="label">2v2 rank</label>
               <PreciseRankPicker value={draft.rank2v2} onChange={(v) => setDraft({ ...draft, rank2v2: v })} />
             </div>
+          </div>
+          <div>
+            <label className="label">RL Tracker URL</label>
+            <input
+              className="input"
+              type="url"
+              placeholder="https://rocketleague.tracker.network/rocket-league/profile/..."
+              value={draft.trackerUrl}
+              onChange={(e) => setDraft({ ...draft, trackerUrl: e.target.value })}
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              If they already have an account, this also updates their profile.
+            </p>
           </div>
           <div>
             <label className="label">Notes</label>
