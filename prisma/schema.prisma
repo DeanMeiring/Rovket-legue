@@ -122,6 +122,14 @@ model Event {
   performances    Performance[]
   discordMessages EventDiscordMessage[]
 
+  // Game roster for the session: who is playing (user ids), how many games,
+  // 3v3 or 2v2, and whether players can see it yet.
+  rosterPool     String[] @default([])
+  rosterGames    Int      @default(6)
+  rosterTeamSize Int      @default(3)
+  rosterShared   Boolean  @default(false)
+  games          EventGame[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -266,4 +274,24 @@ model PlayerAvailability {
   slots     String[]
   note      String?
   updatedAt DateTime @updatedAt
+}
+
+// One game in an event's roster. Played games stay as they are when the
+// roster is rebalanced; the rest are rebuilt from the current pool.
+model EventGame {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  number      Int
+  round       Int
+  blueIds     String[]
+  orangeIds   String[]
+  played      Boolean  @default(false)
+  blueGoals   Int?
+  orangeGoals Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, number])
 }

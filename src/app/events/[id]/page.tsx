@@ -13,6 +13,7 @@ import {
   audienceLabel,
   nameWithTag,
 } from "@/lib/format";
+import EventRoster from "@/components/EventRoster";
 
 type PlayerRef = { id: string; displayName: string | null; username: string };
 type Rsvp = { id: string; status: string; user: PlayerRef };
@@ -273,6 +274,8 @@ export default function EventDetailPage() {
           )}
         </ul>
       </div>
+
+      <EventRoster eventId={event.id} eventTitle={event.title} isAdmin={isAdmin} myId={session?.user.id} />
 
       <div className="card">
         <h2 className="font-bold text-lg mb-4">Performance</h2>
