@@ -23,6 +23,7 @@ export default function EditEventPage() {
           description: event.description || "",
           location: event.location || "",
           startTime: format(new Date(event.startTime), "yyyy-MM-dd'T'HH:mm"),
+          endTime: event.endTime ? format(new Date(event.endTime), "yyyy-MM-dd'T'HH:mm") : "",
         });
       })
       .catch(() => setNotFound(true));

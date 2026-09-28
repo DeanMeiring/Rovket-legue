@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { format } from "date-fns";
+import { formatEventWhen } from "@/lib/format";
 
 const schema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -70,9 +70,9 @@ export async function POST(req: Request) {
     void sendEmail(
       p.email,
       `New ${type.toLowerCase()} scheduled: ${title}`,
-      `<p><strong>${title}</strong> has been scheduled for ${format(
-        new Date(startTime),
-        "EEEE d MMM yyyy, HH:mm"
+      `<p><strong>${title}</strong> has been scheduled for ${formatEventWhen(
+        startTime,
+        endTime || null
       )}.</p>
        ${location ? `<p>Location: ${location}</p>` : ""}
        ${description ? `<p>${description}</p>` : ""}
