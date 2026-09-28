@@ -59,7 +59,9 @@ you're the first admin. Anyone else who signs up via `/signup` will show up unde
 
 ## Email
 
-Reminders and notifications go out over SMTP via `nodemailer`. Set `SMTP_HOST`,
+Reminders and notifications go out through Brevo's email API when `BREVO_API_KEY`
+is set (needed on Railway's Free, Trial and Hobby plans, which block outbound SMTP;
+verify the `EMAIL_FROM` address as a sender in Brevo). Otherwise they go over SMTP via `nodemailer`. Set `SMTP_HOST`,
 `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` in your environment — any
 provider works (Gmail app password, SendGrid, Mailgun, Resend's SMTP endpoint, etc).
 If `SMTP_HOST` isn't set, the app just logs emails to the console instead of sending
