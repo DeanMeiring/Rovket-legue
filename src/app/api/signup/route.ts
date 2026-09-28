@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   });
 
   const admins = await prisma.user.findMany({
-    where: { role: "ADMIN", status: "APPROVED" },
+    where: { role: "ADMIN", status: "APPROVED", notifySignups: true },
     select: { email: true },
   });
   for (const admin of admins) {

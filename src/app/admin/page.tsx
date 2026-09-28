@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { preciseRankLabel } from "@/lib/ranks";
 
 type Team = { id: string; name: string; colorHex: string | null; members: { id: string }[] };
@@ -13,6 +14,8 @@ type UserRow = {
   role: string;
   status: string;
   isPlayer: boolean;
+  isMainAdmin: boolean;
+  notifySignups: boolean;
   rlTrackerUrl: string | null;
   rank1v1: number | null;
   rank2v2: number | null;
@@ -32,6 +35,8 @@ export default function AdminPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTeamName, setNewTeamName] = useState("");
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const { data: session } = useSession();
 
   async function load() {
     setLoading(true);
@@ -51,6 +56,18 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    await load();
+  }
+
+  // Like updateUser, but shows the server's refusal (e.g. not the main admin).
+  async function updateAdmin(id: string, data: Record<string, unknown>) {
+    setAdminError(null);
+    const res = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) setAdminError((await res.json().catch(() => ({}))).error || "Couldn't save that.");
     await load();
   }
 
@@ -101,6 +118,8 @@ export default function AdminPage() {
   const pending = users.filter((u) => u.status === "PENDING");
   const approved = users.filter((u) => u.status === "APPROVED" && u.isPlayer);
   const staff = users.filter((u) => u.status === "APPROVED" && !u.isPlayer);
+  const admins = users.filter((u) => u.status === "APPROVED" && u.role === "ADMIN");
+  const iAmMain = users.some((u) => u.id === session?.user.id && u.isMainAdmin);
   const rejected = users.filter((u) => u.status === "REJECTED");
 
   return (
@@ -275,6 +294,46 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="card">
+        <h2 className="font-bold text-lg mb-1">Admin accounts ({admins.length})</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          {iAmMain
+            ? "Choose which admins get an email when someone signs up or uses their invite link."
+            : "Only the main admin can change who gets sign-up emails."}
+        </p>
+        <ul className="space-y-2">
+          {admins.map((u) => (
+            <li key={u.id} className="flex items-center justify-between gap-3 flex-wrap text-sm">
+              <span>
+                {u.displayName || u.username} <span className="text-slate-500">@{u.username}</span>
+                {u.isMainAdmin && <span className="badge bg-accent/20 text-accent ml-2">Main admin</span>}
+                {!u.isPlayer && <span className="badge bg-panel2 text-slate-400 ml-2">Staff</span>}
+              </span>
+              <div className="flex items-center gap-4">
+                <label className={`flex items-center gap-2 text-xs ${iAmMain ? "" : "opacity-60"}`}>
+                  <input
+                    type="checkbox"
+                    checked={u.notifySignups}
+                    disabled={!iAmMain}
+                    onChange={(e) => updateAdmin(u.id, { notifySignups: e.target.checked })}
+                  />
+                  Sign-up emails
+                </label>
+                {iAmMain && u.id !== session?.user.id && (
+                  <button
+                    className="text-xs text-accent2 hover:underline"
+                    onClick={() => updateAdmin(u.id, { isMainAdmin: !u.isMainAdmin })}
+                  >
+                    {u.isMainAdmin ? "Remove main admin" : "Make main admin"}
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {adminError && <p className="text-red-400 text-sm mt-3">{adminError}</p>}
       </section>
 
       <section className="card">

@@ -36,15 +36,19 @@ enum RsvpStatus {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  username     String     @unique
-  email        String     @unique
-  passwordHash String
-  role         Role       @default(PLAYER)
+  id            String     @id @default(cuid())
+  username      String     @unique
+  email         String     @unique
+  passwordHash  String
+  role          Role       @default(PLAYER)
   // Off for staff-only admins: they manage the site but aren't on the roster,
   // in availability, RSVP lists or team balancing.
-  isPlayer     Boolean    @default(true)
-  status       UserStatus @default(PENDING)
+  isPlayer      Boolean    @default(true)
+  // The main admin (the ADMIN_USERNAME account, set on every deploy) decides
+  // which admins get sign-up emails and who else is a main admin.
+  isMainAdmin   Boolean    @default(false)
+  notifySignups Boolean    @default(true)
+  status        UserStatus @default(PENDING)
 
   displayName      String?
   rlTrackerUrl     String?

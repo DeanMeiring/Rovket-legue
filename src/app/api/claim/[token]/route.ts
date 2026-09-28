@@ -70,7 +70,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
   if (!claimed) return NextResponse.json({ error: INVALID }, { status: 404 });
 
   const admins = await prisma.user.findMany({
-    where: { role: "ADMIN", status: "APPROVED" },
+    where: { role: "ADMIN", status: "APPROVED", notifySignups: true },
     select: { email: true },
   });
   for (const admin of admins) {

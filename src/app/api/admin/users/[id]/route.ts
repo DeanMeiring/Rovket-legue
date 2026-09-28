@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { isMainAdmin, requireAdmin } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 
 const schema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
   role: z.enum(["ADMIN", "PLAYER"]).optional(),
   isPlayer: z.boolean().optional(),
+  notifySignups: z.boolean().optional(),
+  isMainAdmin: z.boolean().optional(),
   teamId: z.string().nullable().optional(),
   rlTrackerUrl: z
     .string()
@@ -36,6 +38,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const data = { ...parsed.data };
+
+  // Only a main admin may change who gets sign-up emails or who is a main
+  // admin, or touch a main admin's account at all.
+  const actingIsMain = await isMainAdmin(admin.id);
+  if (!actingIsMain && (data.notifySignups !== undefined || data.isMainAdmin !== undefined || before.isMainAdmin)) {
+    return NextResponse.json({ error: "Only the main admin can change that." }, { status: 403 });
+  }
+  if (data.isMainAdmin === false && params.id === admin.id) {
+    return NextResponse.json({ error: "You can't remove your own main admin access." }, { status: 400 });
+  }
   const isNewlyApproved = data.status === "APPROVED" && before.status !== "APPROVED";
 
   // Freshly-approved players with no team land in a default holding squad;
@@ -69,7 +81,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     );
   }
 
-  return NextResponse.json(user);
+  const { passwordHash: _, ...safe } = user;
+  return NextResponse.json(safe);
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
@@ -78,6 +91,10 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
 
   if (params.id === admin.id) {
     return NextResponse.json({ error: "You can't delete your own account." }, { status: 400 });
+  }
+  const target = await prisma.user.findUnique({ where: { id: params.id }, select: { isMainAdmin: true } });
+  if (target?.isMainAdmin && !(await isMainAdmin(admin.id))) {
+    return NextResponse.json({ error: "Only the main admin can remove a main admin." }, { status: 403 });
   }
 
   await prisma.user.delete({ where: { id: params.id } });
