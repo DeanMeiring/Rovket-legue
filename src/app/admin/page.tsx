@@ -149,6 +149,9 @@ export default function AdminPage() {
           <Link href="/admin/balance-teams" className="btn-secondary">
             ⚖️ Balance tryout teams
           </Link>
+          <Link href="/admin/coaching-reference" className="btn-secondary">
+            📚 Coaching reference
+          </Link>
           <Link href="/events/new" className="btn-primary">
             + New event
           </Link>

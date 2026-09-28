@@ -69,7 +69,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // duplicate is skipped rather than counted twice.
   const [created] = await prisma.$transaction([
     prisma.performance.createMany({
-      data: pending.map(({ id: _id, playerName: _n, createdAt: _c, ...stats }) => ({ ...stats, userId })),
+      data: pending.map(({ id: _id, playerName: _n, createdAt: _c, stats, ...rest }) => ({
+        ...rest,
+        userId,
+        stats: stats ?? undefined,
+      })),
       skipDuplicates: true,
     }),
     prisma.pendingPerformance.deleteMany({ where: { eventId: params.id, playerName: name } }),

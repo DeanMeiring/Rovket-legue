@@ -16,6 +16,8 @@ import {
 import EventRoster from "@/components/EventRoster";
 import UnmatchedModal from "@/components/UnmatchedModal";
 import ReviewModal from "@/components/ReviewModal";
+import { PlayerStatTiles, ReplayStatsCard } from "@/components/ReplayStats";
+import { averageStats } from "@/lib/replayStats";
 
 type PlayerRef = { id: string; displayName: string | null; username: string };
 type Rsvp = { id: string; status: string; user: PlayerRef };
@@ -29,6 +31,7 @@ type Performance = {
   score: number;
   mvp: boolean;
   win: boolean | null;
+  stats: unknown;
 };
 type EventDetail = {
   id: string;
@@ -307,6 +310,14 @@ export default function EventDetailPage() {
 
       <EventRoster eventId={event.id} eventTitle={event.title} isAdmin={isAdmin} myId={session?.user.id} />
 
+      <ReplayStatsCard
+        players={groupByPlayer(event.performances).map((g) => ({
+          id: g.user.id,
+          name: nameWithTag(g.user),
+          stats: g.rows.map((r) => r.stats),
+        }))}
+      />
+
       <div className="card">
         <h2 className="font-bold text-lg mb-4">Performance</h2>
         {isAdmin && unmatchedCount > 0 && (
@@ -344,7 +355,15 @@ export default function EventDetailPage() {
                 </span>
               </div>
               {openPlayer === g.user.id && (
-                <ul className="mt-2 ml-4 space-y-1">
+                <div className="mt-3 ml-4">
+                  <PlayerStatTiles
+                    stats={g.rows.map((r) => r.stats)}
+                    eventAvg={averageStats(event.performances.map((r) => r.stats))}
+                  />
+                </div>
+              )}
+              {openPlayer === g.user.id && (
+                <ul className="mt-3 ml-4 space-y-1">
                   {g.rows.map((p, i) => (
                     <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-slate-400">
                       <span>

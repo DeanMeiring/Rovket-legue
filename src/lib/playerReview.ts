@@ -1,20 +1,17 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { preciseRankLabel } from "@/lib/ranks";
 import { summarize } from "@/lib/tryoutStats";
+import { coachingReference } from "@/lib/coachingReference";
+import { METRICS, averageStats, formatMetric } from "@/lib/replayStats";
 
 const MODEL = "claude-opus-5-5";
 
 export class ReviewError extends Error {}
 
-// One Claude call. Web search runs server side, so a long search can pause the
-// turn; the paused turn is sent back to let it carry on.
-async function ask(
-  system: string,
-  prompt: string,
-  tools: Anthropic.Beta.BetaToolUnion[] = [],
-  effort: "medium" | "high" = "medium",
-): Promise<{ text: string; model: string }> {
+// One Claude call. No tools: everything it needs is in the prompt.
+async function ask(system: string, prompt: string): Promise<{ text: string; model: string }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new ReviewError("AI reviews are off. Set ANTHROPIC_API_KEY in Railway to turn them on.");
   }
@@ -22,33 +19,26 @@ async function ask(
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
 
   try {
-    for (let turn = 0; turn < 6; turn++) {
-      const response = await client.beta.messages
-        .stream({
-          model: MODEL,
-          max_tokens: 32000,
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
-          thinking: { type: "adaptive" },
-          output_config: { effort },
-          system,
-          tools,
-          messages,
-        })
-        .finalMessage();
+    const response = await client.beta.messages
+      .stream({
+        model: MODEL,
+        max_tokens: 32000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        thinking: { type: "adaptive" },
+        output_config: { effort: "medium" },
+        system,
+        messages,
+      })
+      .finalMessage();
 
-      if (response.stop_reason === "pause_turn") {
-        messages.push({ role: "assistant", content: response.content });
-        continue;
-      }
-      if (response.stop_reason === "refusal") throw new ReviewError("The AI declined to write this.");
-      const text = response.content
-        .flatMap((b) => (b.type === "text" ? [b.text] : []))
-        .join("")
-        .trim();
-      if (!text) throw new ReviewError("The AI returned nothing.");
-      return { text, model: response.model };
-    }
+    if (response.stop_reason === "refusal") throw new ReviewError("The AI declined to write this.");
+    const text = response.content
+      .flatMap((b) => (b.type === "text" ? [b.text] : []))
+      .join("")
+      .trim();
+    if (!text) throw new ReviewError("The AI returned nothing.");
+    return { text, model: response.model };
   } catch (err) {
     if (err instanceof ReviewError) throw err;
     if (err instanceof Anthropic.AuthenticationError) throw new ReviewError("ANTHROPIC_API_KEY is invalid.");
@@ -56,40 +46,12 @@ async function ask(
     if (err instanceof Anthropic.APIError) throw new ReviewError(`AI request failed (${err.status}).`);
     throw err;
   }
-  throw new ReviewError("The research ran too long. Try again.");
 }
 
-const RESEARCH_SYSTEM = `You are researching for the coaches of a university Rocket League club in South Africa.
-Search the web for current, credible material and write a reference brief the coaches' review tool will use to judge players.`;
-
-const RESEARCH_PROMPT = `Research and write a coaching brief on how strong Rocket League players play 3v3 and 2v2, and how coaches assess them. Cover:
-1. What pro and high-level players' ballchasing-style numbers look like per game (goals, assists, saves, shots, score, boost per minute, time behind the ball, time as last back) and how they differ by rank band (Diamond, Champion, Grand Champion, pro), with the sources you found.
-2. Rotation, positioning and decision-making principles top coaches teach, and the common mistakes at Diamond to Champion level.
-3. How to read the stats honestly: which numbers mean something from a few games, and which are noisy or depend on role.
-4. Concrete, well-known ways to improve each area (training packs by type, free play drills, replay review habits, workshop maps), with names where they're widely known.
-Keep it under 1200 words, plain text with short headings and "-" bullets, no markdown symbols like ** or #. Say where sources disagree or numbers are rough.`;
-
-// The newest research brief, or a fresh one when there is none yet.
-export async function coachingBrief(refresh = false) {
-  if (!refresh) {
-    const latest = await prisma.coachingBrief.findFirst({ orderBy: { createdAt: "desc" } });
-    if (latest) return latest;
-  }
-  const { text, model } = await ask(
-    RESEARCH_SYSTEM,
-    RESEARCH_PROMPT,
-    [
-      { type: "web_search_20260209", name: "web_search", max_uses: 8 },
-      { type: "web_fetch_20260209", name: "web_fetch", max_uses: 6 },
-    ],
-    "high",
-  );
-  return prisma.coachingBrief.create({ data: { text, model } });
-}
-
-const REVIEW_SYSTEM = `You write player reviews for a university Rocket League club. The player reads the review on their own dashboard.
-Write to the player directly ("you"), warm but honest, like a good coach. Base every point on their numbers and the coaching brief, and name the number you are going on.
-Structure: a two or three line overview; what you're doing well; what to work on next, most important first; a short practice plan for the coming week with specific drills or training pack types.
+const REVIEW_SYSTEM = `You write player reviews for a university Rocket League club that plays 3v3 (Standard) only. The player reads the review on their own dashboard.
+Write to the player directly ("you"), warm but honest, like a good coach. Base every point on their numbers and the coaching reference, which is your only source for benchmarks, and name the number you are going on.
+Structure: a two or three line overview; what you're doing well; how you adapt to your teammates (see below); what to work on next, most important first; a short practice plan for the coming week with specific drills or training pack types.
+For adapting to teammates, compare their results and stats with stronger, similar and weaker teammates: do they step up and take more responsibility (more saves, more time last back, more boost) with weaker teammates, and do they play a supporting role with stronger ones? Judge adaptability as its own skill, and name the numbers.
 Say plainly when there are too few games to judge something. Don't guess at things the stats can't show. Don't mention team selection, other players by name, or rankings within the club.
 Plain text with short headings and "-" bullets, no markdown symbols like ** or #, under 450 words.`;
 
@@ -112,7 +74,20 @@ export async function writeReview(userId: string) {
   const tryout = user.tryoutEntry?.gameStats ?? [];
   if (!games.length && !tryout.length) throw new ReviewError("This player has no stats yet. Import some replays first.");
 
-  const brief = await coachingBrief();
+  // Club-wide averages give the reviewer something local to compare against.
+  const clubStats = await prisma.performance.findMany({
+    where: { stats: { not: Prisma.DbNull } },
+    select: { stats: true },
+  });
+  const mine = averageStats(games.map((g) => g.stats));
+  const club = averageStats(clubStats.map((p) => p.stats));
+  const detailLines = mine.games
+    ? METRICS.map(
+        (m) => `${m.label}: ${formatMetric(m, mine.values[m.key])} (club average ${formatMetric(m, club.values[m.key])})`,
+      ).join("\n")
+    : "No detailed replay stats.";
+
+  const withMates = await teammateContext(user.id, user.rank3v3, games, tryout);
 
   const lines = games.map((g) =>
     [
@@ -136,15 +111,114 @@ export async function writeReview(userId: string) {
       `avg distance to mates ${r1(t.avgDistanceToMates)}, goals conceded as last defender ${t.goalsConcededAsLastDefender}.`
     : "No tryout positioning stats.";
 
-  const prompt = `Coaching brief:\n${brief.text}\n\n---\nPlayer: ${user.displayName || user.username}
-Ranks: 3v3 ${preciseRankLabel(user.rank3v3) ?? "unknown"}, 2v2 ${preciseRankLabel(user.rank2v2) ?? "unknown"}
+  const prompt = `Coaching reference:\n${coachingReference()}\n\n---\nPlayer: ${user.displayName || user.username}
+3v3 rank: ${preciseRankLabel(user.rank3v3) ?? "unknown"}
 Team: ${user.team?.name ?? "none"}
 Totals: ${totals}
 ${tryoutLine}
+
+Detailed replay stats, per-game averages over ${mine.games} game(s):
+${detailLines}
+
+How they did by teammate strength (teammates' average 3v3 MMR against theirs):
+${withMates}
 
 Game by game:
 ${lines.join("\n") || "none"}`;
 
   const { text, model } = await ask(REVIEW_SYSTEM, prompt);
   return prisma.playerReview.create({ data: { userId, text, model } });
+}
+
+// A teammate average this far from the player's own MMR (about half a division
+// at Champion) counts as stronger or weaker.
+const TEAMMATE_GAP = 50;
+
+type TeamGame = { mates: (number | null)[]; opponents: (number | null)[]; win: boolean | null; score: number; stats: unknown };
+
+// Splits the player's games by how strong their teammates were and summarises
+// each group, so the review can judge how they adapt.
+async function teammateContext(
+  userId: string,
+  ownMmr: number | null,
+  games: { replayId: string | null; win: boolean | null; score: number; stats: unknown }[],
+  tryout: { gameId: string; side: string; win: boolean; score: number; raw: unknown }[],
+): Promise<string> {
+  const teamGames: TeamGame[] = [];
+
+  // Club games: in a replay, players with the same result were on the same side.
+  const replayIds = games.map((g) => g.replayId).filter((id): id is string => !!id);
+  if (replayIds.length) {
+    const rows = await prisma.performance.findMany({
+      where: { replayId: { in: replayIds }, userId: { not: userId } },
+      select: { replayId: true, win: true, user: { select: { rank3v3: true } } },
+    });
+    for (const g of games) {
+      if (!g.replayId || g.win == null) continue;
+      const others = rows.filter((r) => r.replayId === g.replayId);
+      teamGames.push({
+        mates: others.filter((r) => r.win === g.win).map((r) => r.user.rank3v3),
+        opponents: others.filter((r) => r.win !== g.win).map((r) => r.user.rank3v3),
+        win: g.win,
+        score: g.score,
+        stats: g.stats,
+      });
+    }
+  }
+
+  // Tryout games record each player's side.
+  if (tryout.length) {
+    const rows = await prisma.tryoutGameStat.findMany({
+      where: { gameId: { in: tryout.map((t) => t.gameId) } },
+      select: { gameId: true, side: true, player: { select: { rank3v3: true, userId: true } } },
+    });
+    for (const t of tryout) {
+      const others = rows.filter((r) => r.gameId === t.gameId && r.player.userId !== userId);
+      teamGames.push({
+        mates: others.filter((r) => r.side === t.side).map((r) => r.player.rank3v3),
+        opponents: others.filter((r) => r.side !== t.side).map((r) => r.player.rank3v3),
+        win: t.win,
+        score: t.score,
+        stats: t.raw,
+      });
+    }
+  }
+
+  if (!teamGames.length) return "No games with known teammates.";
+  if (ownMmr == null) return "The player's own 3v3 rank isn't set, so teammate strength can't be compared.";
+
+  const avg = (xs: (number | null)[]) => {
+    const v = xs.filter((x): x is number => x != null);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const buckets: Record<string, TeamGame[]> = { "Stronger teammates": [], "Similar teammates": [], "Weaker teammates": [] };
+  let unknown = 0;
+  for (const g of teamGames) {
+    const m = avg(g.mates);
+    if (m == null) {
+      unknown++;
+      continue;
+    }
+    const key = m - ownMmr > TEAMMATE_GAP ? "Stronger teammates" : ownMmr - m > TEAMMATE_GAP ? "Weaker teammates" : "Similar teammates";
+    buckets[key].push(g);
+  }
+
+  const pick = ["saves", "mostBack", "behindBall", "bpm", "avgBoost", "toMates", "offThird"];
+  const lines = Object.entries(buckets).map(([label, gs]) => {
+    if (!gs.length) return `${label}: no games.`;
+    const a = averageStats(gs.map((g) => g.stats));
+    const detail = pick
+      .map((k) => METRICS.find((m) => m.key === k))
+      .filter((m): m is (typeof METRICS)[number] => !!m && a.values[m.key] != null)
+      .map((m) => `${m.label.toLowerCase()} ${formatMetric(m, a.values[m.key])}`)
+      .join(", ");
+    const opp = avg(gs.flatMap((g) => g.opponents));
+    return (
+      `${label}: ${gs.length} games, ${gs.filter((g) => g.win).length} wins, avg score ${r1(gs.reduce((s, g) => s + g.score, 0) / gs.length)}` +
+      (opp != null ? `, opponents avg ${Math.round(opp - ownMmr) >= 0 ? "+" : ""}${Math.round(opp - ownMmr)} MMR vs them` : "") +
+      (detail ? `; ${detail}` : "")
+    );
+  });
+  if (unknown) lines.push(`${unknown} game(s) had teammates without a known rank.`);
+  return lines.join("\n");
 }

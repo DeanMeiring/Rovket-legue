@@ -12,8 +12,6 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [brief, setBrief] = useState<{ text: string; createdAt: string } | null>(null);
-  const [showBrief, setShowBrief] = useState(false);
 
   function show(r: Review | null) {
     setReview(r);
@@ -27,9 +25,6 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
         show(d.review ?? null);
         setLoaded(true);
       });
-    fetch("/api/admin/coaching-brief")
-      .then((r) => r.json())
-      .then((d) => setBrief(d.brief ?? null));
   }, [userId]);
 
   async function call(label: string, url: string, method: string, body: object) {
@@ -48,7 +43,6 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
   async function write() {
     const data = await call("write", "/api/admin/reviews", "POST", { userId });
     if (data) show(data.review);
-    if (!brief) fetch("/api/admin/coaching-brief").then((r) => r.json()).then((d) => setBrief(d.brief ?? null));
   }
 
   async function save(published?: boolean) {
@@ -58,11 +52,6 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
       ...(published === undefined ? {} : { published }),
     });
     if (data) show(data.review);
-  }
-
-  async function refreshResearch() {
-    const data = await call("research", "/api/admin/coaching-brief", "POST", {});
-    if (data) setBrief(data.brief);
   }
 
   const edited = review && text !== review.text;
@@ -82,7 +71,7 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
           </button>
         </div>
         <p className="text-sm text-slate-400 mb-4">
-          Written by Claude from all of this player&apos;s stats, judged against research on pro players and coaching.
+          Written by Claude from all of this player&apos;s stats, judged against the club's coaching reference.
           The player only sees it once you publish it.
         </p>
 
@@ -102,7 +91,7 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
 
         <div className="flex gap-2 flex-wrap mt-3">
           <button onClick={write} disabled={busy !== null} className={review ? "btn-secondary text-sm" : "btn-primary text-sm"}>
-            {busy === "write" ? "Writing, this can take a minute or two..." : review ? "Write a new one" : "Write review"}
+            {busy === "write" ? "Writing..." : review ? "Write a new one" : "Write review"}
           </button>
           {review && edited && (
             <button onClick={() => save()} disabled={busy !== null} className="btn-secondary text-sm">
@@ -121,26 +110,13 @@ export default function ReviewModal({ userId, name, onClose }: { userId: string;
         </div>
         {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
-        <div className="border-t border-border mt-5 pt-3 text-sm">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-slate-400">
-              {brief
-                ? `Coaching research from ${new Date(brief.createdAt).toLocaleDateString()}`
-                : "The first review also researches pro players and coaching, and saves it for the rest."}
-            </span>
-            <span className="flex gap-3">
-              {brief && (
-                <button onClick={() => setShowBrief((s) => !s)} className="text-accent2 hover:underline">
-                  {showBrief ? "Hide research" : "See research"}
-                </button>
-              )}
-              <button onClick={refreshResearch} disabled={busy !== null} className="text-accent2 hover:underline">
-                {busy === "research" ? "Researching..." : brief ? "Refresh research" : "Run research"}
-              </button>
-            </span>
-          </div>
-          {showBrief && brief && <p className="whitespace-pre-wrap text-slate-300 mt-3">{brief.text}</p>}
-        </div>
+        <p className="border-t border-border mt-5 pt-3 text-sm text-slate-400">
+          Benchmarks come from the{" "}
+          <a href="/admin/coaching-reference" target="_blank" className="text-accent2 hover:underline">
+            coaching reference
+          </a>
+          .
+        </p>
       </div>
     </div>
   );

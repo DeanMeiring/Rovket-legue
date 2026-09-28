@@ -184,6 +184,8 @@ model Performance {
   // ballchasing replay the row was imported from, so importing a group twice
   // doesn't count the same game twice.
   replayId String?
+  // Full ballchasing stats block (boost, movement, positioning, demos).
+  stats    Json?
 
   createdAt DateTime @default(now())
 
@@ -319,6 +321,7 @@ model PendingPerformance {
   score      Int     @default(0)
   mvp        Boolean @default(false)
   win        Boolean?
+  stats      Json?
 
   createdAt DateTime @default(now())
 
