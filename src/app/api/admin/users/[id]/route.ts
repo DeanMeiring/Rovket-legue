@@ -5,6 +5,15 @@ import { isMainAdmin, requireAdmin } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 
 const schema = z.object({
+  // Same rules as sign-up. Usernames are the login, so only a main admin changes them.
+  username: z
+    .string()
+    .trim()
+    .min(2, "Username must be at least 2 characters")
+    .max(40, "Username must be 40 characters or fewer")
+    .regex(/^[^\x00-\x1F\x7F]+$/, "Username contains invalid characters")
+    .transform((v) => v.toLowerCase())
+    .optional(),
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
   role: z.enum(["ADMIN", "PLAYER"]).optional(),
   isPlayer: z.boolean().optional(),
@@ -44,6 +53,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const actingIsMain = await isMainAdmin(admin.id);
   if (!actingIsMain && (data.notifySignups !== undefined || data.isMainAdmin !== undefined || before.isMainAdmin)) {
     return NextResponse.json({ error: "Only the main admin can change that." }, { status: 403 });
+  }
+  if (data.username !== undefined && data.username !== before.username) {
+    if (!actingIsMain) return NextResponse.json({ error: "Only the main admin can change usernames." }, { status: 403 });
+    // The seed recreates the ADMIN_USERNAME account on every deploy, so renaming it would leave a copy behind.
+    if (before.username === (process.env.ADMIN_USERNAME || "admin")) {
+      return NextResponse.json(
+        { error: "This login's username comes from ADMIN_USERNAME in Railway. Change it there." },
+        { status: 400 }
+      );
+    }
+    const taken = await prisma.user.findUnique({ where: { username: data.username }, select: { id: true } });
+    if (taken) return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
   }
   if (data.isMainAdmin === false && params.id === admin.id) {
     return NextResponse.json({ error: "You can't remove your own main admin access." }, { status: 400 });

@@ -71,6 +71,18 @@ export default function AdminPage() {
     await load();
   }
 
+  async function renameUser(id: string, username: string) {
+    const next = prompt(`New username for @${username} (this is what they log in with):`, username)?.trim();
+    if (!next || next.toLowerCase() === username) return;
+    const res = await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: next }),
+    });
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error || "Couldn't change the username.");
+    await load();
+  }
+
   async function resetPassword(id: string, name: string) {
     const newPassword = prompt(`New password for ${name} (at least 8 characters):`);
     if (!newPassword) return;
@@ -159,7 +171,14 @@ export default function AdminPage() {
                 <p className="font-medium">
                   {u.displayName || u.username} <span className="text-slate-500 font-normal">@{u.username}</span>
                 </p>
-                <p className="text-xs text-slate-500">{u.email}</p>
+                <p className="text-xs text-slate-500">
+                  {u.email}
+                  {iAmMain && (
+                  <button className="text-accent2 hover:underline ml-2" onClick={() => renameUser(u.id, u.username)}>
+                    Change username
+                  </button>
+                )}
+                </p>
                 <TrackerField user={u} onSaved={load} />
               </div>
               <div className="flex items-center gap-2">
@@ -225,7 +244,14 @@ export default function AdminPage() {
                   {u.displayName || u.username}{" "}
                   {u.role === "ADMIN" && <span className="badge bg-accent2/20 text-accent2 ml-1">Admin</span>}
                 </p>
-                <p className="text-xs text-slate-500">@{u.username} · {u.email}</p>
+                <p className="text-xs text-slate-500">
+                  @{u.username} · {u.email}
+                  {iAmMain && (
+                  <button className="text-accent2 hover:underline ml-2" onClick={() => renameUser(u.id, u.username)}>
+                    Change username
+                  </button>
+                )}
+                </p>
                 <TrackerField user={u} onSaved={load} />
               </div>
               <div className="flex items-center gap-2">
@@ -356,6 +382,11 @@ export default function AdminPage() {
                 <button className="text-accent2 hover:underline text-xs" onClick={() => updateUser(u.id, { isPlayer: true })}>
                   Make a player too
                 </button>
+                {iAmMain && (
+                  <button className="text-accent2 hover:underline text-xs" onClick={() => renameUser(u.id, u.username)}>
+                    Change username
+                  </button>
+                )}
                 <button
                   onClick={() => resetPassword(u.id, u.displayName || u.username)}
                   className="text-accent2 hover:underline text-xs"
