@@ -83,6 +83,32 @@ export default function EventDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
+  const [resendOpen, setResendOpen] = useState(false);
+  const [resendEmail, setResendEmail] = useState(true);
+  const [resendDiscord, setResendDiscord] = useState(true);
+  const [resendOnlyNoReply, setResendOnlyNoReply] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendResult, setResendResult] = useState<string | null>(null);
+
+  async function resend() {
+    if (!event) return;
+    const where = [resendEmail && "email", resendDiscord && "Discord"].filter(Boolean).join(" and ");
+    const who = resendOnlyNoReply ? "players who haven't replied" : "everyone this event is for";
+    if (!confirm(`Send this event again by ${where} to ${who}?`)) return;
+    setResending(true);
+    setResendResult(null);
+    const res = await fetch(`/api/events/${event.id}/resend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: resendEmail, discord: resendDiscord, onlyNoReply: resendOnlyNoReply }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setResendResult(data.message || data.error || "Something went wrong.");
+    setResending(false);
+    // A resend can add RSVP rows for players who joined a team since.
+    if (res.ok) await load();
+  }
+
   async function toggleRsvps() {
     if (!event) return;
     await fetch(`/api/events/${event.id}`, {
@@ -166,7 +192,10 @@ export default function EventDetailPage() {
             <p className="text-sm text-slate-500 mt-1">For: {audienceLabel(event)}</p>
           </div>
           {isAdmin && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => setResendOpen((o) => !o)} className="btn-secondary">
+                Resend
+              </button>
               <Link href={`/events/${event.id}/edit`} className="btn-secondary">
                 Edit event
               </Link>
@@ -177,6 +206,49 @@ export default function EventDetailPage() {
           )}
         </div>
         {event.description && <p className="text-slate-300 mt-4">{event.description}</p>}
+        {isAdmin && resendOpen && (
+          <div className="mt-4 rounded-lg border border-slate-700 p-4 space-y-3">
+            <p className="font-semibold">Send this event again</p>
+            <div className="flex gap-4 flex-wrap text-sm">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={resendEmail} onChange={(e) => setResendEmail(e.target.checked)} />
+                Email
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={resendDiscord} onChange={(e) => setResendDiscord(e.target.checked)} />
+                Discord
+              </label>
+            </div>
+            <div className="flex gap-4 flex-wrap text-sm">
+              <label className="flex items-center gap-2">
+                <input type="radio" checked={!resendOnlyNoReply} onChange={() => setResendOnlyNoReply(false)} />
+                Everyone it&apos;s for
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={resendOnlyNoReply}
+                  disabled={!event.rsvpOpen}
+                  onChange={() => setResendOnlyNoReply(true)}
+                />
+                Only players who haven&apos;t replied
+              </label>
+            </div>
+            <p className="text-xs text-slate-400">
+              Discord replaces the old post with a new one, so the RSVP buttons stay in one place.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={resend}
+                disabled={resending || (!resendEmail && !resendDiscord)}
+                className="btn-primary !py-1 !px-3 text-sm"
+              >
+                {resending ? "Sending..." : "Send"}
+              </button>
+              {resendResult && <p className="text-sm text-slate-300">{resendResult}</p>}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">

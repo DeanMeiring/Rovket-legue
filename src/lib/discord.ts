@@ -378,11 +378,22 @@ function sameDay(a: Date, b: Date) {
 
 // Posts a new event: team events go to each team's own channel (pinging the
 // team role), events for everyone go to DISCORD_EVENTS_CHANNEL_ID.
-export async function announceEvent(eventId: string) {
+// resend swaps the earlier posts for fresh ones, so there's only ever one set
+// of RSVP buttons. mentionUserIds pings those players (by Discord id) instead
+// of the team roles, for a nudge to people who haven't replied.
+export async function announceEvent(
+  eventId: string,
+  { resend = false, mentionUserIds }: { resend?: boolean; mentionUserIds?: string[] } = {},
+): Promise<number> {
   const { eventsChannelId } = discordConfig();
   const msg = await eventMessage(eventId);
-  if (!msg) return;
+  if (!msg) return 0;
   const { event, body } = msg;
+
+  if (resend) {
+    await deleteEventMessages(event.id);
+    await prisma.eventDiscordMessage.deleteMany({ where: { eventId: event.id } });
+  }
 
   const teams = event.forEveryone
     ? []
@@ -406,16 +417,31 @@ export async function announceEvent(eventId: string) {
       targets.push({ channelId: eventsChannelId, roleIds: leftover });
   }
 
+  const heading = resend ? "Reminder" : "New event";
   for (const t of targets) {
+    let content: string;
+    let allowed: { roles?: string[]; users?: string[] };
+    if (mentionUserIds) {
+      // Discord allows at most 100 mentions per message.
+      const users = mentionUserIds.slice(0, 100);
+      content = users.length
+        ? `${heading}, still waiting on your answer: ${users.map((u) => `<@${u}>`).join(" ")}`.slice(0, 2000)
+        : `${heading} 📅`;
+      allowed = { users };
+    } else {
+      content = t.roleIds.length ? `${heading} for ${t.roleIds.map((r) => `<@&${r}>`).join(" ")}` : `${heading} 📅`;
+      allowed = { roles: t.roleIds };
+    }
     const sent = await api<{ id: string }>("POST", `/channels/${t.channelId}/messages`, {
       ...body,
-      content: t.roleIds.length ? `New event for ${t.roleIds.map((r) => `<@&${r}>`).join(" ")}` : "New event 📅",
-      allowed_mentions: { roles: t.roleIds },
+      content,
+      allowed_mentions: allowed,
     });
     await prisma.eventDiscordMessage.create({
       data: { eventId: event.id, channelId: t.channelId, messageId: sent.id },
     });
   }
+  return targets.length;
 }
 
 // Re-draws every post of an event (new counts, edits, RSVPs opening).

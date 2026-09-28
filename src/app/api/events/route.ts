@@ -2,11 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
-import { escapeHtml, sendEmail } from "@/lib/email";
-import { rsvpEmailButtons } from "@/lib/rsvp";
+import { emailEvent } from "@/lib/eventNotify";
 import { announceEvent, quietly } from "@/lib/discord";
-import { formatEventWhen } from "@/lib/format";
-import { audienceSchema, audienceUsersWhere, visibleEventsWhere } from "@/lib/eventAudience";
+import { audienceSchema, visibleEventsWhere } from "@/lib/eventAudience";
 
 const schema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -71,32 +69,7 @@ export async function POST(req: Request) {
   });
 
   // Everyone approved hears about the event; only players get an RSVP row.
-  const players = await prisma.user.findMany({
-    where: audienceUsersWhere(forEveryone, teamIds),
-    select: { email: true, id: true, isPlayer: true },
-  });
-
-  await prisma.eventRsvp.createMany({
-    data: players.filter((p) => p.isPlayer).map((p) => ({ eventId: event.id, userId: p.id })),
-    skipDuplicates: true,
-  });
-
-  for (const p of players) {
-    // Players get RSVP buttons; staff only hear about it.
-    const rsvpPart = !event.rsvpOpen
-      ? "<p>Teams are still being confirmed. You'll be able to RSVP once they are.</p>"
-      : p.isPlayer
-        ? rsvpEmailButtons(event.id, p.id)
-        : "";
-    void sendEmail(
-      p.email,
-      `New ${type.toLowerCase()} scheduled: ${title}`,
-      `<p><strong>${escapeHtml(title)}</strong> has been scheduled for ${formatEventWhen(startTime, endTime || null)}.</p>
-       ${location ? `<p>Location: ${escapeHtml(location)}</p>` : ""}
-       ${description ? `<p>${escapeHtml(description)}</p>` : ""}
-       ${rsvpPart}`
-    );
-  }
+  await emailEvent(event.id);
 
   void quietly("announce event", () => announceEvent(event.id));
 
