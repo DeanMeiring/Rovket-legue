@@ -57,3 +57,10 @@ export function audienceLabel(event: { forEveryone: boolean; audienceTeams?: { n
   const names = (event.audienceTeams ?? []).map((t) => t.name);
   return names.length ? names.join(", ") : "No team";
 }
+
+// "Michael (medicmike)": the display name with the gamertag they log in with,
+// so two players with the same name can be told apart.
+export function nameWithTag(u: { displayName?: string | null; username: string }): string {
+  const name = u.displayName?.trim();
+  return name && name.toLowerCase() !== u.username.toLowerCase() ? `${name} (${u.username})` : u.username;
+}

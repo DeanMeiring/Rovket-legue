@@ -11,6 +11,7 @@ import {
   RSVP_COLOR,
   RSVP_LABEL,
   audienceLabel,
+  nameWithTag,
 } from "@/lib/format";
 
 type PlayerRef = { id: string; displayName: string | null; username: string };
@@ -191,7 +192,7 @@ export default function EventDetailPage() {
         <ul className="space-y-2">
           {event.rsvps.map((r) => (
             <li key={r.id} className="flex items-center justify-between text-sm">
-              <span>{r.user.displayName || r.user.username}</span>
+              <span>{nameWithTag(r.user)}</span>
               <span className={`badge ${RSVP_COLOR[r.status]}`}>{RSVP_LABEL[r.status]}</span>
             </li>
           ))}
@@ -207,7 +208,7 @@ export default function EventDetailPage() {
           {event.performances.map((p) => (
             <li key={p.id} className="flex items-center justify-between text-sm gap-2">
               <span>
-                {p.user.displayName || p.user.username}
+                {nameWithTag(p.user)}
                 {p.mvp && <span className="badge bg-accent/20 text-accent ml-2">MVP</span>}
                 {p.win === true && <span className="badge bg-green-500/20 text-green-300 ml-2">Win</span>}
                 {p.win === false && <span className="badge bg-red-500/20 text-red-300 ml-2">Loss</span>}
@@ -278,7 +279,7 @@ export default function EventDetailPage() {
               <option value="">Select player...</option>
               {event.rsvps.map((r) => (
                 <option key={r.user.id} value={r.user.id}>
-                  {r.user.displayName || r.user.username}
+                  {nameWithTag(r.user)}
                 </option>
               ))}
             </select>

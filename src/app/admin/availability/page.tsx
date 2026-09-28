@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addDays, format, startOfWeek } from "date-fns";
 import { BLOCKS, DAYS, slotFor, slotKey } from "@/lib/availability";
-import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL } from "@/lib/format";
+import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, nameWithTag } from "@/lib/format";
 
 type Player = {
   id: string;
@@ -26,7 +26,7 @@ type EventItem = {
   endTime: string | null;
 };
 
-const nameOf = (p: Player) => p.displayName || p.username;
+const nameOf = (p: Player) => nameWithTag(p);
 
 export default function AdminAvailabilityPage() {
   const [weekOffset, setWeekOffset] = useState(0);
