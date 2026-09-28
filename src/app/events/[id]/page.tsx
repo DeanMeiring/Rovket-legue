@@ -14,6 +14,8 @@ import {
   nameWithTag,
 } from "@/lib/format";
 import EventRoster from "@/components/EventRoster";
+import UnmatchedModal from "@/components/UnmatchedModal";
+import ReviewModal from "@/components/ReviewModal";
 
 type PlayerRef = { id: string; displayName: string | null; username: string };
 type Rsvp = { id: string; status: string; user: PlayerRef };
@@ -74,18 +76,42 @@ export default function EventDetailPage() {
     failed: string[];
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [unmatchedCount, setUnmatchedCount] = useState(0);
+  const [showUnmatched, setShowUnmatched] = useState(false);
+  const [reviewing, setReviewing] = useState<PlayerRef | null>(null);
+  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
     const res = await fetch(`/api/events/${params.id}`);
     if (res.ok) setEvent(await res.json());
     setLoading(false);
+    if (isAdmin) await loadUnmatched();
+  }
+
+  async function loadUnmatched() {
+    const res = await fetch(`/api/events/${params.id}/unmatched`);
+    if (res.ok) setUnmatchedCount((await res.json()).names.length);
+  }
+
+  async function clearImported() {
+    if (!confirm("Remove every stat imported from ballchasing for this event? Stats logged by hand stay.")) return;
+    const res = await fetch(`/api/events/${params.id}/import-replay`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setImportResult(null);
+    setImportError(res.ok ? null : data.error || "Couldn't clear the imported stats.");
+    await load();
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  useEffect(() => {
+    if (isAdmin) loadUnmatched();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, params.id]);
 
   const [resendOpen, setResendOpen] = useState(false);
   const [resendEmail, setResendEmail] = useState(true);
@@ -161,6 +187,7 @@ export default function EventDetailPage() {
     setImportResult(data);
     setReplayUrl("");
     await load();
+    if (data.unmatched?.length) setShowUnmatched(true);
   }
 
   async function deletePerformance(id: string) {
@@ -282,25 +309,61 @@ export default function EventDetailPage() {
 
       <div className="card">
         <h2 className="font-bold text-lg mb-4">Performance</h2>
+        {isAdmin && unmatchedCount > 0 && (
+          <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 mb-4 text-sm">
+            <span className="text-yellow-200">
+              {unmatchedCount} in-game name{unmatchedCount === 1 ? "" : "s"} from the replays still need a player.
+            </span>
+            <button onClick={() => setShowUnmatched(true)} className="btn-secondary !py-1 !px-3 text-sm">
+              Who is this?
+            </button>
+          </div>
+        )}
         <ul className="space-y-2 mb-4">
-          {event.performances.map((p) => (
-            <li key={p.id} className="flex items-center justify-between text-sm gap-2">
-              <span>
-                {nameWithTag(p.user)}
-                {p.mvp && <span className="badge bg-accent/20 text-accent ml-2">MVP</span>}
-                {p.win === true && <span className="badge bg-green-500/20 text-green-300 ml-2">Win</span>}
-                {p.win === false && <span className="badge bg-red-500/20 text-red-300 ml-2">Loss</span>}
-              </span>
-              <span className="text-slate-400">
-                {p.goals}G {p.assists}A {p.saves}S {p.shots} shots · {p.score} pts
-              </span>
-              {isAdmin && (
+          {groupByPlayer(event.performances).map((g) => (
+            <li key={g.user.id} className="text-sm">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <button
-                  onClick={() => deletePerformance(p.id)}
-                  className="text-red-400 hover:underline text-xs"
+                  onClick={() => setOpenPlayer(openPlayer === g.user.id ? null : g.user.id)}
+                  className="text-left hover:text-white"
                 >
-                  Remove
+                  {openPlayer === g.user.id ? "▾" : "▸"} {nameWithTag(g.user)}
+                  {g.mvps > 0 && <span className="badge bg-accent/20 text-accent ml-2">{g.mvps > 1 ? `${g.mvps}× MVP` : "MVP"}</span>}
                 </button>
+                <span className="flex items-center gap-3">
+                  <span className="text-slate-400">
+                    {g.rows.length} game{g.rows.length === 1 ? "" : "s"}
+                    {g.wins + g.losses > 0 && ` · ${g.wins}W ${g.losses}L`} · {g.goals}G {g.assists}A {g.saves}S · avg{" "}
+                    {Math.round(g.score / g.rows.length)} pts
+                  </span>
+                  {isAdmin && (
+                    <button onClick={() => setReviewing(g.user)} className="btn-secondary !py-1 !px-2 text-xs">
+                      Review
+                    </button>
+                  )}
+                </span>
+              </div>
+              {openPlayer === g.user.id && (
+                <ul className="mt-2 ml-4 space-y-1">
+                  {g.rows.map((p, i) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-slate-400">
+                      <span>
+                        Game {i + 1}
+                        {p.mvp && <span className="badge bg-accent/20 text-accent ml-2">MVP</span>}
+                        {p.win === true && <span className="badge bg-green-500/20 text-green-300 ml-2">Win</span>}
+                        {p.win === false && <span className="badge bg-red-500/20 text-red-300 ml-2">Loss</span>}
+                      </span>
+                      <span>
+                        {p.goals}G {p.assists}A {p.saves}S {p.shots} shots · {p.score} pts
+                      </span>
+                      {isAdmin && (
+                        <button onClick={() => deletePerformance(p.id)} className="text-red-400 hover:underline">
+                          Remove
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
             </li>
           ))}
@@ -348,6 +411,9 @@ export default function EventDetailPage() {
                 )}
               </div>
             )}
+            <button type="button" onClick={clearImported} className="text-xs text-red-400 hover:underline">
+              Clear imported stats and start fresh
+            </button>
             <p className="text-xs text-slate-500">
               Paste one replay, or the whole group after the event to pull every game in it. Players are
               matched by in-game name to their username, display name or tryout board tag. Importing a group
@@ -418,6 +484,37 @@ export default function EventDetailPage() {
           </form>
         )}
       </div>
+      {showUnmatched && (
+        <UnmatchedModal eventId={event.id} onClose={() => setShowUnmatched(false)} onChanged={load} />
+      )}
+      {reviewing && (
+        <ReviewModal userId={reviewing.id} name={nameWithTag(reviewing)} onClose={() => setReviewing(null)} />
+      )}
     </div>
   );
+}
+
+// One entry per player with their totals, games in the order they were logged.
+function groupByPlayer(performances: Performance[]) {
+  const groups = new Map<string, { user: PlayerRef; rows: Performance[] }>();
+  for (const p of performances) {
+    const g = groups.get(p.user.id) ?? { user: p.user, rows: [] };
+    g.rows.push(p);
+    groups.set(p.user.id, g);
+  }
+  return [...groups.values()]
+    .map((g) => {
+      const sum = (k: "goals" | "assists" | "saves" | "score") => g.rows.reduce((s, r) => s + r[k], 0);
+      return {
+        ...g,
+        goals: sum("goals"),
+        assists: sum("assists"),
+        saves: sum("saves"),
+        score: sum("score"),
+        mvps: g.rows.filter((r) => r.mvp).length,
+        wins: g.rows.filter((r) => r.win === true).length,
+        losses: g.rows.filter((r) => r.win === false).length,
+      };
+    })
+    .sort((a, b) => b.score / b.rows.length - a.score / a.rows.length);
 }

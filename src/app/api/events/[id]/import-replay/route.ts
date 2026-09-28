@@ -43,20 +43,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // imported again after more replays are added to it.
   const done = new Set(
     (
-      await prisma.performance.findMany({
+      await prisma.eventReplay.findMany({
         where: { eventId: event.id, replayId: { in: replayIds } },
         select: { replayId: true },
       })
-    ).map((p) => p.replayId),
+    ).map((r) => r.replayId),
   );
 
   const users = await prisma.user.findMany({
     where: { status: "APPROVED", isPlayer: true },
     select: { id: true, username: true, displayName: true, tryoutEntry: { select: { tag: true } } },
   });
+  // In-game names an admin has already told us about.
+  const aliases = new Map((await prisma.playerAlias.findMany()).map((a) => [a.name, a.userId]));
 
   function findUser(name: string) {
     const lower = name.trim().toLowerCase();
+    const aliased = aliases.get(lower);
+    if (aliased) return users.find((u) => u.id === aliased);
     return users.find(
       (u) =>
         u.username.toLowerCase() === lower ||
@@ -107,17 +111,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     ];
 
     const rows = [];
+    const pending = [];
     for (const team of teams) {
       for (const p of team.players) {
-        const user = findUser(p.name);
-        if (!user) {
-          unmatched.add(p.name);
-          continue;
-        }
         const core = p.stats?.core || {};
-        rows.push({
+        const stats = {
           eventId: event.id,
-          userId: user.id,
           replayId,
           goals: core.goals ?? 0,
           assists: core.assists ?? 0,
@@ -126,11 +125,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           score: core.score ?? 0,
           mvp: !!core.mvp,
           win: team.won,
-        });
+        };
+        const user = findUser(p.name);
+        if (!user) {
+          unmatched.add(p.name);
+          pending.push({ ...stats, playerName: p.name.trim() });
+          continue;
+        }
+        rows.push({ ...stats, userId: user.id });
         imported.add(user.displayName || user.username);
       }
     }
-    await prisma.performance.createMany({ data: rows, skipDuplicates: true });
+    // Unmatched names are kept so an admin can say who they are afterwards.
+    await prisma.$transaction([
+      prisma.performance.createMany({ data: rows, skipDuplicates: true }),
+      prisma.pendingPerformance.createMany({ data: pending, skipDuplicates: true }),
+      prisma.eventReplay.create({ data: { eventId: event.id, replayId } }),
+    ]);
     games++;
   }
 
@@ -145,4 +156,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     skipped,
     failed,
   });
+}
+
+// Clears everything imported from ballchasing for this event, so the group can
+// be imported again from scratch. Stats logged by hand stay.
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const [removed] = await prisma.$transaction([
+    prisma.performance.deleteMany({ where: { eventId: params.id, replayId: { not: null } } }),
+    prisma.pendingPerformance.deleteMany({ where: { eventId: params.id } }),
+    prisma.eventReplay.deleteMany({ where: { eventId: params.id } }),
+  ]);
+  return NextResponse.json({ removed: removed.count });
 }

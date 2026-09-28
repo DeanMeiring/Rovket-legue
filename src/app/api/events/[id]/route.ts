@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       },
       performances: {
         include: { user: { select: { id: true, displayName: true, username: true } } },
+        orderBy: { createdAt: "asc" },
       },
       createdBy: { select: { displayName: true, username: true } },
     },

@@ -75,6 +75,11 @@ export default async function DashboardPage() {
     include: { event: true },
   });
 
+  const review = await prisma.playerReview.findFirst({
+    where: { userId: user.id, published: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
   return (
     <div className="space-y-8">
       <CompleteProfileModal
@@ -99,6 +104,16 @@ export default async function DashboardPage() {
           )}
         </p>
       </div>
+
+      {review && (
+        <div className="card">
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="font-bold text-lg">Your coach&apos;s review</h2>
+            <span className="text-xs text-slate-500">{format(review.updatedAt, "d MMM yyyy")}</span>
+          </div>
+          <p className="whitespace-pre-wrap text-sm text-slate-300">{review.text}</p>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         {dbUser?.isPlayer && (
