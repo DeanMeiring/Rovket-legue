@@ -69,6 +69,9 @@ export default function EventDetailPage() {
   const [importResult, setImportResult] = useState<{
     imported: string[];
     unmatched: string[];
+    games: number;
+    skipped: number;
+    failed: string[];
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -308,21 +311,31 @@ export default function EventDetailPage() {
 
         {isAdmin && (
           <form onSubmit={importReplay} className="border-t border-border pt-4 space-y-2 mb-4">
-            <p className="label mb-0">Import stats from a ballchasing.com replay</p>
+            <p className="label mb-0">Import stats from ballchasing.com</p>
             <div className="flex gap-2">
               <input
                 className="input"
                 value={replayUrl}
                 onChange={(e) => setReplayUrl(e.target.value)}
-                placeholder="https://ballchasing.com/replay/..."
+                placeholder="Replay or group link, e.g. https://ballchasing.com/group/..."
               />
               <button type="submit" disabled={importing} className="btn-secondary whitespace-nowrap">
-                {importing ? "Importing..." : "Import"}
+                {importing ? "Importing, this can take a minute..." : "Import"}
               </button>
             </div>
             {importError && <p className="text-red-400 text-sm">{importError}</p>}
             {importResult && (
               <div className="text-sm">
+                <p className="text-slate-300">
+                  Imported {importResult.games} game{importResult.games === 1 ? "" : "s"}
+                  {importResult.skipped > 0 && `, skipped ${importResult.skipped} already imported`}.
+                </p>
+                {importResult.failed.length > 0 && (
+                  <p className="text-yellow-400">
+                    Couldn&apos;t read {importResult.failed.length} replay(s), ballchasing may still be processing them.
+                    Import the group again in a minute: {importResult.failed.join(", ")}
+                  </p>
+                )}
                 {importResult.imported.length > 0 && (
                   <p className="text-green-400">
                     Imported: {importResult.imported.join(", ")}
@@ -336,8 +349,9 @@ export default function EventDetailPage() {
               </div>
             )}
             <p className="text-xs text-slate-500">
-              Matches replay players to app accounts by name. Needs BALLCHASING_API_KEY
-              set on the server.
+              Paste one replay, or the whole group after the event to pull every game in it. Players are
+              matched by in-game name to their username, display name or tryout board tag. Importing a group
+              again only adds the new replays.
             </p>
           </form>
         )}
