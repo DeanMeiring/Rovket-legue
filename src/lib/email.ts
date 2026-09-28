@@ -24,6 +24,19 @@ function getTransporter() {
   return transporter;
 }
 
+// Escapes user-supplied text (names, usernames) before it goes into an email.
+export function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+// A button linking into the app, e.g. appButton("/admin", "Review in admin panel").
+// Uses NEXTAUTH_URL as the site address; without it the button is left out.
+export function appButton(path: string, label: string): string {
+  const base = process.env.NEXTAUTH_URL?.replace(/\/+$/, "");
+  if (!base) return "";
+  return `<p><a href="${base}${path}" style="display:inline-block;padding:10px 18px;background:#ff8a00;color:#111;border-radius:8px;text-decoration:none;font-weight:bold">${escapeHtml(label)}</a></p>`;
+}
+
 const DEFAULT_FROM = "Rocket League Team <no-reply@example.com>";
 
 // Splits "RL Team Hub <team@gmail.com>" into its name and address.

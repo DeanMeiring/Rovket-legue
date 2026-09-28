@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
+import { appButton, escapeHtml, sendEmail } from "@/lib/email";
 import { claimSchema } from "@/lib/claimSchema";
 
 const INVALID = "This link isn't valid any more. Ask an admin for a new one.";
@@ -76,9 +76,11 @@ export async function POST(req: Request, { params }: { params: { token: string }
   for (const admin of admins) {
     void sendEmail(
       admin.email,
-      "Tryout player claimed their account",
-      `<p><strong>${displayName}</strong> (@${username}) set up their account from their invite link.</p>
-       <p>Approve them in the admin panel.</p>`
+      `${player.tag} requested access with their invite link`,
+      `<p><strong>${escapeHtml(displayName)}</strong> (@${escapeHtml(username)}) requested access using their invite link
+       and set up their account.</p>
+       <p>Approve them in the admin panel.</p>
+       ${appButton("/admin", "Review in admin panel")}`
     );
   }
 
