@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
-import { discordConfig, ensureTeamDiscord, registerCommands, syncMemberRoles } from "@/lib/discord";
+import {
+  discordConfig,
+  ensureTeamDiscord,
+  positionTeamRoles,
+  registerCommands,
+  removeOldSharedCategory,
+  syncMemberRoles,
+} from "@/lib/discord";
 
 // Admin: Discord bot status and one-off setup actions.
 export async function GET() {
@@ -15,7 +22,14 @@ export async function GET() {
     prisma.user.count({ where: { status: "APPROVED", isPlayer: true } }),
     prisma.team.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, discordRoleId: true, discordTextChannelId: true, discordVoiceChannelId: true },
+      select: {
+        id: true,
+        name: true,
+        discordRoleId: true,
+        discordCategoryId: true,
+        discordTextChannelId: true,
+        discordVoiceChannelId: true,
+      },
     }),
   ]);
   const base = process.env.NEXTAUTH_URL?.replace(/\/+$/, "");
@@ -34,7 +48,7 @@ export async function GET() {
     teams: teams.map((t) => ({
       id: t.id,
       name: t.name,
-      ready: !!(t.discordRoleId && t.discordTextChannelId && t.discordVoiceChannelId),
+      ready: !!(t.discordRoleId && t.discordCategoryId && t.discordTextChannelId && t.discordVoiceChannelId),
     })),
   });
 }
@@ -57,6 +71,8 @@ export async function POST(req: Request) {
     }
     const teams = await prisma.team.findMany({ select: { id: true } });
     for (const t of teams) await ensureTeamDiscord(t.id);
+    await removeOldSharedCategory();
+    await positionTeamRoles();
     // Re-check everyone linked, in case roles were changed by hand in Discord.
     const linked = await prisma.user.findMany({ where: { discordId: { not: null } }, select: { id: true } });
     for (const u of linked) await syncMemberRoles(u.id);

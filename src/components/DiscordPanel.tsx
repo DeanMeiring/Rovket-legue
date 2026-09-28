@@ -68,7 +68,7 @@ export default function DiscordPanel() {
               <li key={t.id} className="flex justify-between">
                 <span>{t.name}</span>
                 <span className={t.ready ? "text-green-400" : "text-slate-500"}>
-                  {t.ready ? "Role, text and voice ready" : "Not set up"}
+                  {t.ready ? "Role, category, text and voice ready" : "Not set up"}
                 </span>
               </li>
             ))}

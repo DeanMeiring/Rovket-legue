@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
-import { ensureTeamDiscord, quietly } from "@/lib/discord";
+import { ensureTeamDiscord, positionTeamRoles, quietly } from "@/lib/discord";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(60),
@@ -39,7 +39,10 @@ export async function POST(req: Request) {
   });
 
   // A new team gets its Discord role and channels straight away.
-  void quietly("team setup", () => ensureTeamDiscord(team.id));
+  void quietly("team setup", async () => {
+    await ensureTeamDiscord(team.id);
+    await positionTeamRoles();
+  });
 
   return NextResponse.json(team, { status: 201 });
 }
