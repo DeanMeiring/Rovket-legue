@@ -8,6 +8,7 @@ import Link from "next/link";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
 import PreciseRankPicker from "@/components/PreciseRankPicker";
 import WeekSchedule from "@/components/WeekSchedule";
+import Avatar, { squareImage } from "@/components/Avatar";
 import { PlayerBenchmarkCard } from "@/components/ReplayStats";
 import type { Averages } from "@/lib/replayStats";
 
@@ -29,6 +30,7 @@ type Player = {
   id: string;
   username: string;
   displayName: string | null;
+  avatarUpdatedAt: string | null;
   rlTrackerUrl: string | null;
   platform: string | null;
   discordTag: string | null;
@@ -69,6 +71,36 @@ export default function PlayerProfilePage() {
   const [pwSuccess, setPwSuccess] = useState(false);
 
   const isSelf = session?.user.id === params.id;
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  async function changeAvatar(file: File | undefined) {
+    if (!file || !player) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      const dataUrl = await squareImage(file);
+      const res = await fetch(`/api/avatar/${player.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't save that picture.");
+      setPlayer({ ...player, avatarUpdatedAt: data.avatarUpdatedAt });
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Couldn't save that picture.");
+    }
+    setAvatarBusy(false);
+  }
+
+  async function removeAvatar() {
+    if (!player) return;
+    setAvatarBusy(true);
+    await fetch(`/api/avatar/${player.id}`, { method: "DELETE" });
+    setPlayer({ ...player, avatarUpdatedAt: null });
+    setAvatarBusy(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -177,11 +209,39 @@ export default function PlayerProfilePage() {
 
       <div className="card">
         <div className="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">{player.displayName || player.username}</h1>
-            <p className="text-slate-400">
-              @{player.username} {player.team && `· ${player.team.name}`}
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center gap-1">
+              <Avatar id={player.id} name={player.displayName || player.username} version={player.avatarUpdatedAt} size={80} />
+              {isSelf && (
+                <div className="flex gap-2 text-xs">
+                  <label className="text-accent2 hover:underline cursor-pointer">
+                    {avatarBusy ? "Saving..." : player.avatarUpdatedAt ? "Change" : "Add photo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={avatarBusy}
+                      onChange={(e) => {
+                        changeAvatar(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {player.avatarUpdatedAt && !avatarBusy && (
+                    <button onClick={removeAvatar} className="text-slate-400 hover:text-red-400">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">{player.displayName || player.username}</h1>
+              <p className="text-slate-400">
+                @{player.username} {player.team && `· ${player.team.name}`}
+              </p>
+              {avatarError && <p className="text-red-400 text-xs mt-1">{avatarError}</p>}
+            </div>
           </div>
           {isSelf && (
             <button onClick={() => setEditing((e) => !e)} className="btn-secondary">

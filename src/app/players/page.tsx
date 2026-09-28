@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Avatar from "@/components/Avatar";
 
 type Player = {
   id: string;
   username: string;
   displayName: string | null;
+  avatarUpdatedAt: string | null;
   rlTrackerUrl: string | null;
   platform: string | null;
   role: string;
@@ -44,14 +46,17 @@ export default function PlayersPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {members.map((p) => (
               <Link href={`/players/${p.id}`} key={p.id} className="card hover:border-accent transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold">{p.displayName || p.username}</span>
-                  {p.role === "ADMIN" && (
-                    <span className="badge bg-accent2/20 text-accent2">Admin</span>
-                  )}
+                <div className="flex items-center gap-3">
+                  <Avatar id={p.id} name={p.displayName || p.username} version={p.avatarUpdatedAt} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold truncate">{p.displayName || p.username}</span>
+                      {p.role === "ADMIN" && <span className="badge bg-accent2/20 text-accent2">Admin</span>}
+                    </div>
+                    <p className="text-sm text-slate-500 truncate">@{p.username}</p>
+                    {p.platform && <p className="text-xs text-slate-500 mt-1">{p.platform}</p>}
+                  </div>
                 </div>
-                <p className="text-sm text-slate-500">@{p.username}</p>
-                {p.platform && <p className="text-xs text-slate-500 mt-1">{p.platform}</p>}
               </Link>
             ))}
           </div>

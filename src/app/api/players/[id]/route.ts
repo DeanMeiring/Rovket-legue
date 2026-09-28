@@ -14,6 +14,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       id: true,
       username: true,
       displayName: true,
+      avatarUpdatedAt: true,
       rlTrackerUrl: true,
       platform: true,
       discordTag: true,

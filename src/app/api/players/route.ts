@@ -13,6 +13,7 @@ export async function GET() {
       id: true,
       username: true,
       displayName: true,
+      avatarUpdatedAt: true,
       rlTrackerUrl: true,
       platform: true,
       discordTag: true,
