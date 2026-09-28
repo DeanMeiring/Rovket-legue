@@ -7,7 +7,7 @@ export type BoardPlayer = {
   id: string;
   tag: string;
   name: string | null;
-  currentTeam: number; // 0 = new, 1 = first team (locked), 2-4 = other teams
+  currentTeam: number; // 0 = new, 1-4 = current team
   rank2v2: number | null;
   rank3v3: number | null;
   notes: string | null;
@@ -19,7 +19,7 @@ export type BoardPlayer = {
 // gap this far from the roster's usual gap is worth a second look.
 export const GAP_FLAG_MMR = 150;
 
-// Teams 2-4 are trios; first team stays locked.
+// Provisional layouts keep Team 1 as-is and fill teams 2-4 with trios.
 export const OPEN_TEAMS = 3;
 export const OPEN_SPOTS = OPEN_TEAMS * 3;
 

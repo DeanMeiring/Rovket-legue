@@ -139,7 +139,7 @@ model TryoutPlayer {
   id          String  @id @default(cuid())
   tag         String
   name        String?
-  // 0 = new / unassigned, 1 = first team (locked benchmark), 2-4 = other teams
+  // 0 = new / unassigned, 1-4 = current team
   currentTeam Int     @default(0)
   rank2v2     Int?
   rank3v3     Int?

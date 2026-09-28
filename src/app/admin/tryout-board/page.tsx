@@ -21,7 +21,7 @@ import {
 
 const TEAM_OPTIONS = [
   { value: 0, label: "New" },
-  { value: 1, label: "Team 1 (locked)" },
+  { value: 1, label: "Team 1" },
   { value: 2, label: "Team 2" },
   { value: 3, label: "Team 3" },
   { value: 4, label: "Team 4" },
@@ -30,7 +30,7 @@ const TEAM_OPTIONS = [
 const FLAG_STYLE: Record<Flag, { label: string; className: string }> = {
   understated: { label: "3v3 may understate", className: "bg-yellow-500/15 text-yellow-300" },
   specialist: { label: "3v3 specialist", className: "bg-accent2/15 text-accent2" },
-  challenger: { label: "First-team challenger", className: "bg-accent/15 text-accent" },
+  challenger: { label: "Standout rank", className: "bg-accent/15 text-accent" },
 };
 
 type Draft = {
@@ -178,8 +178,7 @@ export default function TryoutBoardPage() {
           </Link>
           <h1 className="text-3xl font-bold">Tryout board</h1>
           <p className="text-slate-500 text-sm mt-1">
-            3v3 tryouts. Team 1 stays locked as the benchmark; everyone else competes for teams 2 to 4 and the sub spots.
-            Ranks are a starting point, tryout play decides.
+            3v3 tryout roster and provisional teams. Ranks are a starting point, tryout play decides.
           </p>
         </div>
         <button className="btn-secondary" onClick={() => runImport("signups")}>
@@ -224,10 +223,10 @@ export default function TryoutBoardPage() {
           </div>
           {challengers.length > 0 && (
             <div className="card !p-4 border-l-4 !border-l-accent">
-              <p className="font-semibold">The first-team lock is contested</p>
+              <p className="font-semibold">Standout ranks</p>
               <p className="text-sm text-slate-400 mt-1">
-                {challengers.map((p) => p.tag).join(", ")} {challengers.length > 1 ? "are" : "is"} at or above a
-                first-team player&apos;s 3v3 rank. Give them a challenge match so &quot;open to everyone&quot; holds up.
+                {challengers.map((p) => p.tag).join(", ")} {challengers.length > 1 ? "have" : "has"} a 3v3 rank at Team
+                1&apos;s level. Worth a close look in tryouts.
               </p>
             </div>
           )}
@@ -250,7 +249,7 @@ export default function TryoutBoardPage() {
           <h2 className="font-bold text-lg mb-1">Roster ({players.length})</h2>
           <p className="text-slate-500 text-xs mb-4">
             Gap is 2v2 minus 3v3 MMR. Flags fire when a player&apos;s gap is {GAP_FLAG_MMR}+ MMR from this roster&apos;s
-            median{medGap != null ? ` (${signed(medGap)})` : ""}, or when their 3v3 is at or above the lowest first-team
+            median{medGap != null ? ` (${signed(medGap)})` : ""}, or when their 3v3 is at or above the lowest Team 1
             3v3.
           </p>
           <div className="overflow-x-auto -mx-5 px-5">
@@ -424,7 +423,7 @@ export default function TryoutBoardPage() {
             Nothing here changes anyone&apos;s real team.
           </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <TeamCard title="Team 1 · locked" players={layouts.firstTeam} highlight />
+            <TeamCard title="Team 1" players={layouts.firstTeam} highlight />
             {openTeams.map((t, i) => (
               <TeamCard key={i} title={`Team ${i + 2}`} players={t} />
             ))}
