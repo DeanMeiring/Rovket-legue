@@ -181,9 +181,14 @@ export default function TryoutBoardPage() {
             3v3 tryout roster and provisional teams. Ranks are a starting point, tryout play decides.
           </p>
         </div>
-        <button className="btn-secondary" onClick={() => runImport("signups")}>
-          Import app sign-ups
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/admin/tryout-games" className="btn-primary">
+            Tryout games
+          </Link>
+          <button className="btn-secondary" onClick={() => runImport("signups")}>
+            Import app sign-ups
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}

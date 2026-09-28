@@ -1,0 +1,140 @@
+// Builds balanced 3v3 tryout games from the tryout roster. Pure functions so
+// the API route and any preview share the same logic.
+
+export type RatedPlayer = {
+  id: string;
+  rank2v2: number | null;
+  rank3v3: number | null;
+};
+
+export type GameSides = { blueIds: string[]; orangeIds: string[] };
+
+export type GeneratedGame = GameSides & { number: number; round: number };
+
+// Weighting of the two playlists: tryouts are 3v3, but 2v2 still says a lot
+// about mechanics, and it catches players whose 3v3 rank lags behind.
+export const WEIGHT_3V3 = 0.7;
+export const WEIGHT_2V2 = 0.3;
+
+// How much a repeated teammate pairing "costs", in MMR of side imbalance.
+// Around a sub-rank, so the generator accepts a slightly less even game to
+// avoid putting the same two players together again.
+const REPEAT_PENALTY = 60;
+
+export function ratingOf(p: RatedPlayer, fallback: number): number {
+  if (p.rank3v3 != null && p.rank2v2 != null) return WEIGHT_3V3 * p.rank3v3 + WEIGHT_2V2 * p.rank2v2;
+  return p.rank3v3 ?? p.rank2v2 ?? fallback;
+}
+
+export function ratingMap(players: RatedPlayer[]): Map<string, number> {
+  const known = players
+    .map((p) => ratingOf(p, NaN))
+    .filter((r) => !Number.isNaN(r))
+    .sort((a, b) => a - b);
+  const fallback = known.length ? known[Math.floor(known.length / 2)] : 1000;
+  return new Map(players.map((p) => [p.id, ratingOf(p, fallback)]));
+}
+
+function pairKey(a: string, b: string) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+function seeded(seed: number) {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Every way to split six players into two trios, with player 0 fixed on blue.
+const SPLITS: [number[], number[]][] = [];
+for (let i = 1; i < 6; i++)
+  for (let j = i + 1; j < 6; j++) {
+    const blue = [0, i, j];
+    SPLITS.push([blue, [0, 1, 2, 3, 4, 5].filter((x) => !blue.includes(x))]);
+  }
+
+function bestSplit(six: string[], rating: Map<string, number>, pairs: Map<string, number>) {
+  let best: { cost: number; blue: string[]; orange: string[] } | null = null;
+  for (const [b, o] of SPLITS) {
+    const blue = b.map((i) => six[i]);
+    const orange = o.map((i) => six[i]);
+    const sum = (ids: string[]) => ids.reduce((s, id) => s + (rating.get(id) ?? 0), 0);
+    let cost = Math.abs(sum(blue) - sum(orange)) / 3;
+    for (const side of [blue, orange])
+      for (let x = 0; x < 3; x++)
+        for (let y = x + 1; y < 3; y++) cost += REPEAT_PENALTY * (pairs.get(pairKey(side[x], side[y])) ?? 0);
+    if (!best || cost < best.cost) best = { cost, blue, orange };
+  }
+  return best!;
+}
+
+// Generates `count` games. Each round, the players with the fewest games so
+// far play (so sit-outs rotate), and they are split into games whose sides
+// are as even as possible while avoiding repeat teammates. `history` holds
+// games already played, so a regenerate carries on from where things stand.
+export function generateGames(
+  players: RatedPlayer[],
+  count: number,
+  history: GameSides[] = [],
+  start: { number: number; round: number } = { number: 1, round: 1 },
+  seed = 20260928
+): GeneratedGame[] {
+  if (players.length < 6 || count < 1) return [];
+  const rnd = seeded(seed + players.length * 7919 + history.length);
+  const rating = ratingMap(players);
+  const ids = players.map((p) => p.id);
+  const plays = new Map(ids.map((id) => [id, 0]));
+  const pairs = new Map<string, number>();
+
+  const record = (g: GameSides) => {
+    for (const side of [g.blueIds, g.orangeIds]) {
+      side.forEach((id) => plays.has(id) && plays.set(id, plays.get(id)! + 1));
+      for (let x = 0; x < side.length; x++)
+        for (let y = x + 1; y < side.length; y++) {
+          const k = pairKey(side[x], side[y]);
+          pairs.set(k, (pairs.get(k) ?? 0) + 1);
+        }
+    }
+  };
+  history.forEach(record);
+
+  const perRound = Math.floor(ids.length / 6);
+  const games: GeneratedGame[] = [];
+  let round = start.round;
+
+  while (games.length < count) {
+    const n = Math.min(perRound, count - games.length);
+    const playing = [...ids]
+      .map((id) => ({ id, r: rnd() }))
+      .sort((a, b) => plays.get(a.id)! - plays.get(b.id)! || a.r - b.r)
+      .slice(0, n * 6)
+      .map((x) => x.id);
+
+    // Random-restart search over which six go in which game.
+    let best: { cost: number; games: { blue: string[]; orange: string[] }[] } | null = null;
+    const tries = n === 1 ? 1 : 400;
+    for (let t = 0; t < tries; t++) {
+      const shuffled = t === 0 ? playing : [...playing].sort(() => rnd() - 0.5);
+      let cost = 0;
+      const split = [];
+      for (let g = 0; g < n; g++) {
+        const res = bestSplit(shuffled.slice(g * 6, g * 6 + 6), rating, pairs);
+        cost += res.cost;
+        split.push(res);
+      }
+      if (!best || cost < best.cost) best = { cost, games: split };
+    }
+
+    for (const g of best!.games) {
+      const game = { blueIds: g.blue, orangeIds: g.orange, number: start.number + games.length, round };
+      games.push(game);
+      record(game);
+    }
+    round++;
+  }
+  return games;
+}

@@ -22,6 +22,14 @@ A team management site for tryouts, rosters, events, and performance tracking.
   The admin panel's "Balance tryout teams" tool then snake-drafts a selected pool of
   players into N teams as evenly matched as possible, and creates the teams in one click.
 
+- **Tryout games.** Admin → Tryout board → Tryout games generates a set of 3v3 games
+  (12 by default) where both sides of every game are balanced on 70% 3v3 rank + 30% 2v2
+  rank, and players rotate so they rarely repeat a teammate. After each game, upload the
+  `.replay` file (it goes to ballchasing.com as a private replay) or paste a ballchasing
+  link, and the page builds a per-player stats table: score, goals, saves, boost, time
+  behind the ball, time as last back, distance to teammates. With `ANTHROPIC_API_KEY` set,
+  "Evaluate with AI" writes a short evaluation of those stats.
+
 Messaging is email-only for now (see [`docs/messaging-notes.md`](./docs/messaging-notes.md)
 for why, and how to add Telegram later if you want it).
 
