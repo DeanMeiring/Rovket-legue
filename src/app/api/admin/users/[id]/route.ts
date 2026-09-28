@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email";
 const schema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
   role: z.enum(["ADMIN", "PLAYER"]).optional(),
+  isPlayer: z.boolean().optional(),
   teamId: z.string().nullable().optional(),
   rlTrackerUrl: z
     .string()

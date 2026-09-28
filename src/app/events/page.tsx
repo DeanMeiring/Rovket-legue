@@ -11,6 +11,7 @@ import {
   formatEventWhen,
   RSVP_COLOR,
   RSVP_LABEL,
+  audienceLabel,
 } from "@/lib/format";
 
 type Rsvp = { userId: string; status: string };
@@ -23,6 +24,8 @@ type EventItem = {
   startTime: string;
   endTime: string | null;
   rsvpOpen: boolean;
+  forEveryone: boolean;
+  audienceTeams: { id: string; name: string }[];
   rsvps: Rsvp[];
   createdBy: { displayName: string | null; username: string };
 };
@@ -112,6 +115,9 @@ export default function EventsPage() {
                     <Link href={`/events/${ev.id}`} className="font-bold text-lg hover:underline">
                       {ev.title}
                     </Link>
+                    {!ev.forEveryone && (
+                      <span className="badge bg-accent2/15 text-accent2">For {audienceLabel(ev)}</span>
+                    )}
                   </div>
                   <p className="text-sm text-slate-400 mt-1">
                     {formatEventWhen(ev.startTime, ev.endTime)}

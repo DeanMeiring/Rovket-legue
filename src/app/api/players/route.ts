@@ -7,7 +7,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const players = await prisma.user.findMany({
-    where: { status: "APPROVED" },
+    where: { status: "APPROVED", isPlayer: true },
     orderBy: { displayName: "asc" },
     select: {
       id: true,

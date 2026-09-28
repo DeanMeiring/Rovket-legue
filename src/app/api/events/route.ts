@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireApprovedUser } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { formatEventWhen } from "@/lib/format";
+import { audienceSchema, audienceUsersWhere, visibleEventsWhere } from "@/lib/eventAudience";
 
 const schema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -12,6 +13,7 @@ const schema = z.object({
   location: z.string().trim().max(200).optional().or(z.literal("")),
   startTime: z.string().datetime().or(z.string().min(1)),
   endTime: z.string().optional().or(z.literal("")),
+  ...audienceSchema,
 });
 
 export async function GET() {
@@ -19,9 +21,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const events = await prisma.event.findMany({
+    where: await visibleEventsWhere(user),
     orderBy: { startTime: "asc" },
     include: {
       rsvps: true,
+      audienceTeams: { select: { id: true, name: true } },
       createdBy: { select: { displayName: true, username: true } },
     },
   });
@@ -43,6 +47,11 @@ export async function POST(req: Request) {
   }
 
   const { title, type, description, location, startTime, endTime } = parsed.data;
+  const forEveryone = parsed.data.forEveryone ?? true;
+  const teamIds = forEveryone ? [] : (parsed.data.teamIds ?? []);
+  if (!forEveryone && teamIds.length === 0) {
+    return NextResponse.json({ error: "Pick at least one team, or choose Everyone." }, { status: 400 });
+  }
 
   const event = await prisma.event.create({
     data: {
@@ -53,17 +62,20 @@ export async function POST(req: Request) {
       startTime: new Date(startTime),
       endTime: endTime ? new Date(endTime) : null,
       rsvpOpen: type !== "TOURNAMENT",
+      forEveryone,
+      audienceTeams: { connect: teamIds.map((id) => ({ id })) },
       createdById: admin.id,
     },
   });
 
+  // Everyone approved hears about the event; only players get an RSVP row.
   const players = await prisma.user.findMany({
-    where: { status: "APPROVED" },
-    select: { email: true, id: true },
+    where: audienceUsersWhere(forEveryone, teamIds),
+    select: { email: true, id: true, isPlayer: true },
   });
 
   await prisma.eventRsvp.createMany({
-    data: players.map((p) => ({ eventId: event.id, userId: p.id })),
+    data: players.filter((p) => p.isPlayer).map((p) => ({ eventId: event.id, userId: p.id })),
     skipDuplicates: true,
   });
 

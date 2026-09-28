@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, formatEventWhen, RSVP_COLOR, RSVP_LABEL } from "@/lib/format";
+import { visibleEventsWhere } from "@/lib/eventAudience";
 import CompleteProfileModal from "@/components/CompleteProfileModal";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
 
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
       team: {
         include: {
           members: {
-            where: { status: "APPROVED" },
+            where: { status: "APPROVED", isPlayer: true },
             orderBy: { rank3v3: { sort: "desc", nulls: "last" } },
             select: { id: true, username: true, displayName: true, rank3v3: true },
           },
@@ -54,7 +55,12 @@ export default async function DashboardPage() {
   const teammates = dbUser?.team?.members.filter((m) => m.id !== user.id) ?? [];
 
   const upcomingEvents = await prisma.event.findMany({
-    where: { OR: [{ startTime: { gte: new Date() } }, { endTime: { gte: new Date() } }] },
+    where: {
+      AND: [
+        { OR: [{ startTime: { gte: new Date() } }, { endTime: { gte: new Date() } }] },
+        await visibleEventsWhere(user),
+      ],
+    },
     orderBy: { startTime: "asc" },
     take: 5,
     include: {
@@ -95,45 +101,47 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-lg">{dbUser?.team ? dbUser.team.name : "Your team"}</h2>
-            <Link href={`/players/${user.id}`} className="text-sm text-accent2 hover:underline">
-              Your profile
-            </Link>
-          </div>
-          {dbUser?.team ? (
-            teammates.length > 0 ? (
-              <ul className="space-y-2 text-sm mb-4">
-                {teammates.map((m) => (
-                  <li key={m.id} className="flex items-center justify-between">
-                    <Link href={`/players/${m.id}`} className="hover:underline">
-                      {m.displayName || m.username}
-                    </Link>
-                    <span className="text-slate-400">{preciseRankLabel(m.rank3v3) ?? "No rank set"}</span>
-                  </li>
-                ))}
-              </ul>
+        {dbUser?.isPlayer && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">{dbUser?.team ? dbUser.team.name : "Your team"}</h2>
+              <Link href={`/players/${user.id}`} className="text-sm text-accent2 hover:underline">
+                Your profile
+              </Link>
+            </div>
+            {dbUser?.team ? (
+              teammates.length > 0 ? (
+                <ul className="space-y-2 text-sm mb-4">
+                  {teammates.map((m) => (
+                    <li key={m.id} className="flex items-center justify-between">
+                      <Link href={`/players/${m.id}`} className="hover:underline">
+                        {m.displayName || m.username}
+                      </Link>
+                      <span className="text-slate-400">{preciseRankLabel(m.rank3v3) ?? "No rank set"}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-slate-500 text-sm mb-4">No teammates assigned yet.</p>
+              )
             ) : (
-              <p className="text-slate-500 text-sm mb-4">No teammates assigned yet.</p>
-            )
-          ) : (
-            <p className="text-slate-500 text-sm mb-4">An admin will place you on a team after tryouts.</p>
-          )}
-          <div className="border-t border-border/60 pt-3 space-y-1 text-sm">
-            {PLAYLISTS.map((p) => (
-              <p key={p.key} className="flex justify-between">
-                <span className="text-slate-400">{p.label}</span>
-                <span>{preciseRankLabel(dbUser?.[p.key]) ?? "Not set"}</span>
-              </p>
-            ))}
-            {dbUser?.rlTrackerUrl && (
-              <a href={dbUser.rlTrackerUrl} target="_blank" rel="noreferrer" className="text-accent2 hover:underline text-xs">
-                RL Tracker profile
-              </a>
+              <p className="text-slate-500 text-sm mb-4">An admin will place you on a team after tryouts.</p>
             )}
+            <div className="border-t border-border/60 pt-3 space-y-1 text-sm">
+              {PLAYLISTS.map((p) => (
+                <p key={p.key} className="flex justify-between">
+                  <span className="text-slate-400">{p.label}</span>
+                  <span>{preciseRankLabel(dbUser?.[p.key]) ?? "Not set"}</span>
+                </p>
+              ))}
+              {dbUser?.rlTrackerUrl && (
+                <a href={dbUser.rlTrackerUrl} target="_blank" rel="noreferrer" className="text-accent2 hover:underline text-xs">
+                  RL Tracker profile
+                </a>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="card">
           <div className="flex items-center justify-between mb-4">
