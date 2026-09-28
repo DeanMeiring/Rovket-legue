@@ -8,6 +8,8 @@ import Link from "next/link";
 import { PLAYLISTS, preciseRankLabel } from "@/lib/ranks";
 import PreciseRankPicker from "@/components/PreciseRankPicker";
 import WeekSchedule from "@/components/WeekSchedule";
+import { PlayerBenchmarkCard } from "@/components/ReplayStats";
+import type { Averages } from "@/lib/replayStats";
 
 type Performance = {
   id: string;
@@ -18,6 +20,7 @@ type Performance = {
   score: number;
   mvp: boolean;
   win: boolean | null;
+  stats: unknown;
   createdAt: string;
   event: { id: string; title: string; startTime: string; type: string } | null;
 };
@@ -37,6 +40,7 @@ type Player = {
   rank3v3: number | null;
   team: { id: string; name: string } | null;
   performances: Performance[];
+  clubAvg: Averages;
 };
 
 export default function PlayerProfilePage() {
@@ -358,6 +362,8 @@ export default function PlayerProfilePage() {
           ))}
         </div>
       </div>
+
+      <PlayerBenchmarkCard stats={player.performances.map((p) => p.stats)} clubAvg={player.clubAvg} />
 
       <div className="card">
         <h2 className="font-bold text-lg mb-4">Performance history</h2>

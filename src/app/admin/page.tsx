@@ -23,6 +23,7 @@ type UserRow = {
   rank3v3: number | null;
   teamId: string | null;
   team: { id: string; name: string } | null;
+  discordId: string | null;
 };
 
 const RANK_FIELDS = [
@@ -130,6 +131,7 @@ export default function AdminPage() {
 
   const pending = users.filter((u) => u.status === "PENDING");
   const approved = users.filter((u) => u.status === "APPROVED" && u.isPlayer);
+  const unlinked = approved.filter((u) => !u.discordId);
   const staff = users.filter((u) => u.status === "APPROVED" && !u.isPlayer);
   const admins = users.filter((u) => u.status === "APPROVED" && u.role === "ADMIN");
   const iAmMain = users.some((u) => u.id === session?.user.id && u.isMainAdmin);
@@ -239,6 +241,31 @@ export default function AdminPage() {
       </section>
 
       <DiscordPanel />
+
+      <section className="card">
+        <h2 className="font-bold text-lg mb-1">
+          Not linked to Discord{" "}
+          {unlinked.length > 0 && <span className="badge bg-accent/20 text-accent">{unlinked.length}</span>}
+        </h2>
+        <p className="text-sm text-slate-400 mb-3">
+          Approved players who haven&apos;t run /link in Discord yet. They don&apos;t get their team role, event buttons or
+          reminders there until they do.
+        </p>
+        {unlinked.length === 0 ? (
+          <p className="text-sm text-slate-500">Every approved player is linked.</p>
+        ) : (
+          <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+            {unlinked.map((u) => (
+              <li key={u.id} className="flex justify-between gap-3 border-b border-border/50 py-1">
+                <Link href={`/players/${u.id}`} className="hover:text-white truncate">
+                  {u.displayName ? `${u.displayName} (${u.username})` : u.username}
+                </Link>
+                <span className="text-slate-500 shrink-0">{u.team?.name ?? "No team"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="card">
         <h2 className="font-bold text-lg mb-4">Approved players ({approved.length})</h2>
