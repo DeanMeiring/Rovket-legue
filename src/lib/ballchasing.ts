@@ -39,6 +39,26 @@ export function extractReplayId(input: string): string | null {
   return match ? match[1] : null;
 }
 
+// Tells a replay link (or bare replay id) from a group link, e.g.
+// https://ballchasing.com/group/monday-practise-88i5kpsirh
+export function parseBallchasingLink(input: string): { kind: "replay" | "group"; id: string } | null {
+  const trimmed = input.trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
+  const group = trimmed.match(/\/group\/([\w-]+)$/);
+  if (group) return { kind: "group", id: group[1] };
+  const path = trimmed.match(/\/replay\/([\w-]+)$/);
+  if (path) return { kind: "replay", id: path[1] };
+  const uuid = trimmed.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+  if (uuid) return { kind: "replay", id: uuid[1] };
+  // A bare group id, like "monday-practise-88i5kpsirh".
+  if (/^[\w-]+$/.test(trimmed)) return { kind: "group", id: trimmed };
+  const replay = extractReplayId(trimmed);
+  if (replay) return { kind: "replay", id: replay };
+  return null;
+}
+
+// Overridable only so tests can point at a fake server.
+const API = process.env.BALLCHASING_API_BASE || "https://ballchasing.com/api";
+
 function apiKeyOrThrow(): string {
   const apiKey = process.env.BALLCHASING_API_KEY;
   if (!apiKey) {
@@ -77,7 +97,7 @@ export async function uploadReplay(file: Blob, filename: string): Promise<string
 }
 
 export async function fetchReplay(replayId: string): Promise<BallchasingReplay> {
-  const res = await fetch(`https://ballchasing.com/api/replays/${replayId}`, {
+  const res = await fetch(`${API}/replays/${replayId}`, {
     headers: { Authorization: apiKeyOrThrow() },
   });
 
@@ -88,4 +108,23 @@ export async function fetchReplay(replayId: string): Promise<BallchasingReplay> 
   }
 
   return res.json();
+}
+
+// Ids of every replay directly in a ballchasing group, oldest first.
+export async function listGroupReplays(group: string): Promise<{ id: string; title?: string }[]> {
+  const out: { id: string; title?: string; date?: string }[] = [];
+  let url: string | null =
+    `${API}/replays?${new URLSearchParams({ group, count: "200", "sort-by": "replay-date", "sort-dir": "asc" })}`;
+  while (url && out.length < 1000) {
+    const res: Response = await fetch(url, { headers: { Authorization: apiKeyOrThrow() } });
+    if (!res.ok) {
+      if (res.status === 404) throw new Error("Group not found on ballchasing.com.");
+      if (res.status === 401) throw new Error("Ballchasing API key is invalid.");
+      throw new Error(`Ballchasing API error (${res.status}).`);
+    }
+    const data = await res.json();
+    out.push(...(data.list ?? []));
+    url = data.next ?? null;
+  }
+  return out.map((r) => ({ id: r.id, title: r.title }));
 }

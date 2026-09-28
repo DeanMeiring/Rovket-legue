@@ -177,9 +177,13 @@ model Performance {
   mvp     Boolean  @default(false)
   win     Boolean?
   notes   String?
+  // ballchasing replay the row was imported from, so importing a group twice
+  // doesn't count the same game twice.
+  replayId String?
 
   createdAt DateTime @default(now())
 
+  @@unique([replayId, userId])
   @@index([userId])
   @@index([eventId])
 }
