@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
+import { appButton, escapeHtml, sendEmail } from "@/lib/email";
 import { RANKS } from "@/lib/ranks";
 
 const schema = z.object({
@@ -86,8 +86,9 @@ export async function POST(req: Request) {
     void sendEmail(
       admin.email,
       "New tryout signup pending approval",
-      `<p><strong>${displayName}</strong> (@${normalizedUsername}) just requested an account.</p>
-       <p>Review it in the admin panel to approve and assign them to a team.</p>`
+      `<p><strong>${escapeHtml(displayName)}</strong> (@${escapeHtml(normalizedUsername)}) just requested an account.</p>
+       <p>Review it in the admin panel to approve and assign them to a team.</p>
+       ${appButton("/admin", "Review in admin panel")}`
     );
   }
 
