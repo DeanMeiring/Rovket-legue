@@ -42,22 +42,23 @@ model User {
   role         Role       @default(PLAYER)
   status       UserStatus @default(PENDING)
 
-  displayName    String?
-  rlTrackerUrl   String?
-  platform       String?
-  discordTag     String?
-  bio            String?
-  rank1v1        Int?
-  rank2v2        Int?
-  rank3v3        Int?
+  displayName      String?
+  rlTrackerUrl     String?
+  platform         String?
+  discordTag       String?
+  bio              String?
+  rank1v1          Int?
+  rank2v2          Int?
+  rank3v3          Int?
   profileCompleted Boolean @default(false)
 
   teamId String?
-  team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   createdEvents Event[]       @relation("EventCreatedBy")
   rsvps         EventRsvp[]
   performances  Performance[]
+  tryoutEntry   TryoutPlayer?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -67,8 +68,8 @@ model User {
 }
 
 model Team {
-  id        String  @id @default(cuid())
-  name      String  @unique
+  id        String   @id @default(cuid())
+  name      String   @unique
   colorHex  String?
   members   User[]
   createdAt DateTime @default(now())
@@ -111,18 +112,18 @@ model EventRsvp {
 }
 
 model Performance {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   eventId String?
   event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
   userId  String
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  goals   Int     @default(0)
-  assists Int     @default(0)
-  saves   Int     @default(0)
-  shots   Int     @default(0)
-  score   Int     @default(0)
-  mvp     Boolean @default(false)
+  goals   Int      @default(0)
+  assists Int      @default(0)
+  saves   Int      @default(0)
+  shots   Int      @default(0)
+  score   Int      @default(0)
+  mvp     Boolean  @default(false)
   win     Boolean?
   notes   String?
 
@@ -130,4 +131,23 @@ model Performance {
 
   @@index([userId])
   @@index([eventId])
+}
+
+// Admin-maintained tryout roster. Separate from User so admins can add
+// players who haven't made an account yet; `userId` links the two once they do.
+model TryoutPlayer {
+  id          String  @id @default(cuid())
+  tag         String
+  name        String?
+  // 0 = new / unassigned, 1 = first team (locked benchmark), 2-4 = other teams
+  currentTeam Int     @default(0)
+  rank2v2     Int?
+  rank3v3     Int?
+  notes       String?
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
