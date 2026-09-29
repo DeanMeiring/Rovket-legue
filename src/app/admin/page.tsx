@@ -145,6 +145,12 @@ export default function AdminPage() {
           <Link href="/admin/tryout-board" className="btn-secondary">
             📋 Tryout board
           </Link>
+          <Link href="/admin/players" className="btn-secondary">
+            🗂️ Player portfolios
+          </Link>
+          <Link href="/admin/chemistry" className="btn-secondary">
+            🧩 Chemistry
+          </Link>
           <Link href="/admin/availability" className="btn-secondary">
             🗓️ Availability
           </Link>

@@ -36,6 +36,7 @@ export const METRICS: Metric[] = [
   { key: "highAir", label: "Time high in air", group: "Movement", unit: "%", better: "role", read: (s) => s.movement?.percent_high_air, pro: [8, 9] },
   { key: "behindBall", label: "Time behind ball", group: "Positioning", unit: "%", better: "higher", read: (s) => s.positioning?.percent_behind_ball, pro: [71, 77] },
   { key: "mostBack", label: "Time last back", group: "Positioning", unit: "%", better: "role", read: (s) => s.positioning?.percent_most_back },
+  { key: "mostForward", label: "Time furthest forward", group: "Positioning", unit: "%", better: "role", read: (s) => s.positioning?.percent_most_forward },
   { key: "defThird", label: "Time in defensive third", group: "Positioning", unit: "%", better: "role", read: (s) => s.positioning?.percent_defensive_third, pro: [43, 47] },
   { key: "offThird", label: "Time in attacking third", group: "Positioning", unit: "%", better: "role", read: (s) => s.positioning?.percent_offensive_third, pro: [21, 24] },
   { key: "toMates", label: "Distance to teammates", group: "Positioning", unit: "", better: "role", read: (s) => s.positioning?.avg_distance_to_mates, digits: 0, pro: [3350, 3730] },
