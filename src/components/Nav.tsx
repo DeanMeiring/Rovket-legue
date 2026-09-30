@@ -37,7 +37,8 @@ export default function Nav() {
   const isAdmin = session.user.role === "ADMIN";
   const allLinks = [
     ...links,
-    ...(captainTeam ? [{ href: "/captain", label: "Captain" }] : []),
+    // Admins get every team's dashboard; a captain gets their own.
+    ...(isAdmin ? [{ href: "/captain", label: "Teams" }] : captainTeam ? [{ href: "/captain", label: "Captain" }] : []),
     ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
