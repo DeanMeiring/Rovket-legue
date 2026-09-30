@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireApprovedUser } from "@/lib/session";
+import { requireApprovedUser } from "@/lib/session";
+import { CAPTAIN_EVENT_TYPES, captainDayTaken, captainTeamFor } from "@/lib/captain";
 import { emailEvent } from "@/lib/eventNotify";
 import { announceEvent, quietly } from "@/lib/discord";
 import { audienceSchema, visibleEventsWhere } from "@/lib/eventAudience";
@@ -34,8 +35,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApprovedUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const isAdmin = user.role === "ADMIN";
+  // Captains can schedule events for their own team only.
+  const captainTeam = isAdmin ? null : await captainTeamFor(user);
+  if (!isAdmin && !captainTeam) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -47,10 +52,19 @@ export async function POST(req: Request) {
   }
 
   const { title, type, description, location, startTime, endTime } = parsed.data;
-  const forEveryone = parsed.data.forEveryone ?? true;
-  const teamIds = forEveryone ? [] : (parsed.data.teamIds ?? []);
+  const forEveryone = captainTeam ? false : (parsed.data.forEveryone ?? true);
+  const teamIds = captainTeam ? [captainTeam.id] : forEveryone ? [] : (parsed.data.teamIds ?? []);
   if (!forEveryone && teamIds.length === 0) {
     return NextResponse.json({ error: "Pick at least one team, or choose Everyone." }, { status: 400 });
+  }
+  if (captainTeam) {
+    if (!(CAPTAIN_EVENT_TYPES as readonly string[]).includes(type)) {
+      return NextResponse.json({ error: "Captains can schedule practices, scrims, matches and tournaments." }, { status: 400 });
+    }
+    const clash = await captainDayTaken(user.id, captainTeam.id, new Date(startTime));
+    if (clash) {
+      return NextResponse.json({ error: `You already scheduled "${clash}" that day. Captains can schedule one event a day.` }, { status: 400 });
+    }
   }
 
   const event = await prisma.event.create({
@@ -64,7 +78,7 @@ export async function POST(req: Request) {
       rsvpOpen: type !== "TOURNAMENT",
       forEveryone,
       audienceTeams: { connect: teamIds.map((id) => ({ id })) },
-      createdById: admin.id,
+      createdById: user.id,
     },
   });
 

@@ -68,6 +68,7 @@ model User {
 
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  captainOf Team? @relation("TeamCaptain")
 
   createdEvents Event[]             @relation("EventCreatedBy")
   rsvps         EventRsvp[]
@@ -93,6 +94,9 @@ model Team {
   discordCategoryId     String?
   discordTextChannelId  String?
   discordVoiceChannelId String?
+  // The team's captain: schedules the team's own events and sees the Captain's dashboard.
+  captainId             String?  @unique
+  captain               User?    @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: SetNull)
   members               User[]
   events                Event[]  @relation("EventAudience")
   createdAt             DateTime @default(now())

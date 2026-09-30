@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { EVENT_TYPE_LABEL } from "@/lib/format";
+import { useCaptainTeam } from "@/components/useCaptainTeam";
+
+const CAPTAIN_TYPES = ["PRACTICE", "SCRIM", "MATCH", "TOURNAMENT"];
 
 export type EventFormValues = {
   title: string;
@@ -25,6 +29,11 @@ export default function EventForm({
   initialValues?: EventFormValues;
 }) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user.role === "ADMIN";
+  // Captains schedule for their own team only, from a shorter list of types.
+  const captainTeam = useCaptainTeam();
+  const asCaptain = !isAdmin && !!captainTeam;
   const [form, setForm] = useState<EventFormValues>(
     initialValues || {
       title: "",
@@ -65,7 +74,7 @@ export default function EventForm({
       setError("The end has to be after the start.");
       return;
     }
-    if (!form.forEveryone && form.teamIds.length === 0) {
+    if (!asCaptain && !form.forEveryone && form.teamIds.length === 0) {
       setError("Pick at least one team, or choose Everyone.");
       return;
     }
@@ -92,7 +101,7 @@ export default function EventForm({
       return;
     }
 
-    router.push(mode === "edit" ? `/events/${eventId}` : "/events");
+    router.push(mode === "edit" ? `/events/${eventId}` : asCaptain ? "/captain" : "/events");
     router.refresh();
   }
 
@@ -120,7 +129,9 @@ export default function EventForm({
               value={form.type}
               onChange={(e) => update("type", e.target.value)}
             >
-              {Object.entries(EVENT_TYPE_LABEL).map(([value, label]) => (
+              {Object.entries(EVENT_TYPE_LABEL)
+                .filter(([value]) => !asCaptain || CAPTAIN_TYPES.includes(value) || value === form.type)
+                .map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
@@ -150,6 +161,14 @@ export default function EventForm({
               For multi-day events like tournaments, set the last day here.
             </p>
           </div>
+          {asCaptain ? (
+            <div>
+              <label className="label">Who is this for?</label>
+              <p className="text-sm text-slate-300">
+                {captainTeam!.name} only. Captains can schedule one event a day for their team.
+              </p>
+            </div>
+          ) : (
           <div>
             <label className="label">Who is this for?</label>
             <div className="space-y-2">
@@ -182,6 +201,7 @@ export default function EventForm({
               )}
             </div>
           </div>
+          )}
           <div>
             <label className="label">Location / lobby info</label>
             <input
@@ -217,7 +237,9 @@ export default function EventForm({
           </div>
           {mode === "create" && (
             <p className="text-xs text-slate-500">
-              {form.forEveryone
+              {asCaptain
+                ? `Only ${captainTeam!.name} sees this event and gets the email and Discord post.`
+                : form.forEveryone
                 ? "Everyone approved gets an email when this is created."
                 : "Only players in the chosen teams see this event and get the email."}
             </p>

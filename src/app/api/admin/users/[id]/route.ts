@@ -90,6 +90,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     include: { team: true },
   });
 
+  // A captain who moves team (or loses access) stops captaining the old one.
+  if (user.teamId !== before.teamId || user.status !== "APPROVED") {
+    await prisma.team.updateMany({
+      where: { captainId: user.id, ...(user.teamId && user.status === "APPROVED" && { id: { not: user.teamId } }) },
+      data: { captainId: null },
+    });
+  }
+
   // Give or take away their team's Discord role.
   if (user.teamId !== before.teamId || user.status !== before.status) {
     void quietly("team role", () => syncMemberRoles(user.id));
