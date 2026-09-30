@@ -38,7 +38,17 @@ export default function TeamBoard({
   pairs: Combo[];
   trios: Combo[];
 }) {
-  const [slots, setSlots] = useState<Slots>(initialSlots);
+  // Only players the page knows about, each in one place, so a stale save can't break the board.
+  const [slots, setSlots] = useState<Slots>(() => {
+    const known = new Set(people.map((p) => p.key));
+    const seen = new Set<string>();
+    return Object.fromEntries(
+      SLOTS.map((s) => [
+        s,
+        (initialSlots?.[s] ?? []).filter((k) => known.has(k) && !seen.has(k) && !!seen.add(k)),
+      ]),
+    ) as Slots;
+  });
   const [picked, setPicked] = useState<string | null>(null);
   const [status, setStatus] = useState<"saved" | "saving" | "error">("saved");
   const byKey = useMemo(() => new Map(people.map((p) => [p.key, p])), [people]);
@@ -106,9 +116,11 @@ export default function TeamBoard({
   }
 
   function summary(keys: string[]) {
-    const ranks = keys.map((k) => byKey.get(k)!.rank3v3).filter((r): r is number => r != null);
+    const ranks = keys.map((k) => byKey.get(k)?.rank3v3).filter((r): r is number => r != null);
     const avg = ranks.length ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : null;
-    const styles = keys.map((k) => byKey.get(k)!.style).filter((st) => st !== "Not enough games");
+    const styles = keys
+      .map((k) => byKey.get(k)?.style)
+      .filter((st): st is string => !!st && st !== "Not enough games");
     const sorted = [...keys].sort();
     const trio = keys.length === 3 ? trioMap.get(sorted.join("|")) : undefined;
     const pairList: Combo[] = [];
@@ -147,12 +159,13 @@ export default function TeamBoard({
         </div>
         {picked && where(picked) !== slot && (
           <button onClick={() => move(picked, slot)} className="text-xs text-accent2 hover:underline text-left">
-            Move {byKey.get(picked)!.label} here
+            Move {byKey.get(picked)?.label} here
           </button>
         )}
         <ul className="space-y-1.5">
           {keys.map((k) => {
-            const p = byKey.get(k)!;
+            const p = byKey.get(k);
+            if (!p) return null;
             return (
               <li key={k}>
                 <button
@@ -198,7 +211,7 @@ export default function TeamBoard({
       <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
         <p className="text-slate-400">
           {picked
-            ? `Picked ${byKey.get(picked)!.label}. Click another player to swap, or a column to move them.`
+            ? `Picked ${byKey.get(picked)?.label}. Click another player to swap, or a column to move them.`
             : "Click a player to pick them up, then click another player to swap or a column to move them."}
         </p>
         <span className="flex items-center gap-3">
