@@ -14,6 +14,7 @@ import Avatar from "@/components/Avatar";
 // when people are free, and how the team has been playing. Tryout games are
 // left out: they're judged separately. Admins can open any team's dashboard.
 
+const ALL = "all";
 const TEAM_METRICS = ["bpm", "zeroBoost", "speed", "supersonic", "behindBall", "toMates", "demos"];
 
 export default async function CaptainPage({ searchParams }: { searchParams: { team?: string } }) {
@@ -29,34 +30,36 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
         select: { id: true, name: true, captain: { select: { displayName: true, username: true } } },
       })
     : [];
+  // Admins start on every player and can switch to any team; captains only see their own.
   const teamId = isAdmin
-    ? (allTeams.find((t) => t.id === searchParams.team)?.id ?? ownTeam?.id ?? allTeams.find((t) => t.captain)?.id ?? allTeams[0]?.id)
+    ? (allTeams.find((t) => t.id === searchParams.team)?.id ?? ALL)
     : ownTeam!.id;
-  if (!teamId) {
-    return <p className="text-slate-500">No teams yet. Create one on the admin page first.</p>;
-  }
 
-  const team = await prisma.team.findUnique({
-    where: { id: teamId },
-    include: {
-      captain: { select: { id: true, displayName: true, username: true } },
-      members: {
-        where: { status: "APPROVED", isPlayer: true },
-        orderBy: { rank3v3: { sort: "desc", nulls: "last" } },
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          rank2v2: true,
-          rank3v3: true,
-          discordId: true,
-          avatarUpdatedAt: true,
-          availability: { select: { slots: true } },
-        },
-      },
+  const memberQuery = {
+    where: { status: "APPROVED" as const, isPlayer: true },
+    orderBy: { rank3v3: { sort: "desc" as const, nulls: "last" as const } },
+    select: {
+      id: true,
+      username: true,
+      displayName: true,
+      rank2v2: true,
+      rank3v3: true,
+      discordId: true,
+      avatarUpdatedAt: true,
+      availability: { select: { slots: true } },
+      teamId: true,
+      team: { select: { name: true } },
     },
-  });
+  };
+  const team =
+    teamId === ALL
+      ? { id: ALL, name: "All players", captain: null, members: await prisma.user.findMany(memberQuery) }
+      : await prisma.team.findUnique({
+          where: { id: teamId },
+          include: { captain: { select: { id: true, displayName: true, username: true } }, members: memberQuery },
+        });
   if (!team) redirect("/captain");
+  const isAll = team.id === ALL;
   const memberIds = team.members.map((m) => m.id);
   const isMyTeam = ownTeam?.id === team.id;
   const now = new Date();
@@ -73,14 +76,14 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
       where: {
         AND: [
           { OR: [{ startTime: { gte: now } }, { endTime: { gte: now } }] },
-          { OR: [{ forEveryone: true }, { audienceTeams: { some: { id: team.id } } }] },
+          isAll ? {} : { OR: [{ forEveryone: true }, { audienceTeams: { some: { id: team.id } } }] },
         ],
       },
       orderBy: { startTime: "asc" },
       take: 8,
       include: {
         rsvps: { where: { userId: { in: memberIds } }, select: { userId: true, status: true } },
-        audienceTeams: { select: { id: true } },
+        audienceTeams: { select: { id: true, name: true } },
       },
     }),
   ]);
@@ -144,25 +147,29 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold">Captain&apos;s dashboard</h1>
+          <h1 className="text-3xl font-bold">{isAdmin ? "Team dashboards" : "Captain\u2019s dashboard"}</h1>
           <p className="text-slate-400 mt-1">
             <span className="text-accent font-semibold">{team.name}</span>
-            {team.captain ? ` · Captain: ${nameWithTag(team.captain)}` : " · No captain picked yet"}
+            {isAll
+              ? ` · ${team.members.length} players across every team`
+              : team.captain
+                ? ` · Captain: ${nameWithTag(team.captain)}`
+                : " · No captain picked yet"}
           </p>
         </div>
-        {(isMyTeam || isAdmin) && (
+        {(isMyTeam || (isAdmin && !isAll)) && (
           <Link href="/events/new" className="btn-primary">
             + Schedule a team event
           </Link>
         )}
       </div>
 
-      {isAdmin && allTeams.length > 1 && (
+      {isAdmin && (
         <div className="flex flex-wrap gap-2 text-sm">
-          {allTeams.map((t) => (
+          {[{ id: ALL, name: "All players" }, ...allTeams].map((t) => (
             <Link
               key={t.id}
-              href={`/captain?team=${t.id}`}
+              href={t.id === ALL ? "/captain" : `/captain?team=${t.id}`}
               className={`px-3 py-1 rounded-full border ${
                 t.id === team.id ? "border-accent bg-accent/15" : "border-border hover:border-accent2"
               }`}
@@ -184,7 +191,9 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
         <div className="card">
           <p className="text-xs text-slate-400">Games together</p>
           <p className="text-3xl font-bold">{together.length}</p>
-          <p className="text-xs text-slate-500">Two or more of the team on the same side</p>
+          <p className="text-xs text-slate-500">
+            Two or more {isAll ? "club players" : "of the team"} on the same side
+          </p>
         </div>
         <div className="card">
           <p className="text-xs text-slate-400">Record together</p>
@@ -209,15 +218,20 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
       </div>
 
       <div className="card">
-        <h2 className="font-bold text-lg mb-3">Upcoming for {team.name}</h2>
+        <h2 className="font-bold text-lg mb-3">{isAll ? "Upcoming events" : `Upcoming for ${team.name}`}</h2>
         {upcoming.length === 0 ? (
           <p className="text-sm text-slate-500">Nothing scheduled.</p>
         ) : (
           <ul className="space-y-3">
             {upcoming.map((ev) => {
               const status = new Map(ev.rsvps.map((r) => [r.userId, r.status]));
-              const count = (s: string) => memberIds.filter((id) => status.get(id) === s).length;
-              const waiting = memberIds.filter((id) => !status.get(id) || status.get(id) === "PENDING");
+              // Only the players the event is for: everyone, or the players in its teams.
+              const aud = new Set(ev.audienceTeams.map((t) => t.id));
+              const invited = team.members
+                .filter((m) => ev.forEveryone || (m.teamId != null && aud.has(m.teamId)))
+                .map((m) => m.id);
+              const count = (s: string) => invited.filter((id) => status.get(id) === s).length;
+              const waiting = invited.filter((id) => !status.get(id) || status.get(id) === "PENDING");
               const mine =
                 ev.createdById === user.id && !ev.forEveryone && ev.audienceTeams.length === 1 && isMyTeam;
               return (
@@ -229,7 +243,7 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
                     <span className={`badge ${EVENT_TYPE_COLOR[ev.type]}`}>{EVENT_TYPE_LABEL[ev.type]}</span>
                     {mine && <span className="badge bg-accent/15 text-accent ml-1">Yours</span>}
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {formatEventWhen(ev.startTime, ev.endTime)} · {ev.forEveryone ? "Everyone" : "Team only"}
+                      {formatEventWhen(ev.startTime, ev.endTime)} · {ev.forEveryone ? "Everyone" : isAll ? ev.audienceTeams.map((t) => t.name).join(", ") : "Team only"}
                     </p>
                     {waiting.length > 0 && (
                       <p className="text-xs text-slate-500 mt-0.5">
@@ -254,6 +268,7 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
           <thead className="text-slate-400 text-xs text-left">
             <tr>
               <th className="py-1">Player</th>
+              {isAll && <th>Team</th>}
               <th>3v3</th>
               <th>2v2</th>
               <th>Games</th>
@@ -274,6 +289,7 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
                     {team.captain?.id === p.id && <span className="badge bg-accent/15 text-accent">C</span>}
                   </Link>
                 </td>
+                {isAll && <td className="text-slate-400">{p.team?.name ?? "No team"}</td>}
                 <td>{preciseRankLabel(p.rank3v3) ?? "–"}</td>
                 <td>{preciseRankLabel(p.rank2v2) ?? "–"}</td>
                 <td>{p.games}</td>
@@ -288,7 +304,7 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
             ))}
             {players.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-3 text-slate-500">
+                <td colSpan={isAll ? 10 : 9} className="py-3 text-slate-500">
                   No players on this team yet.
                 </td>
               </tr>
@@ -307,11 +323,12 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
           <thead className="text-slate-400 text-xs text-left">
             <tr>
               <th className="py-1">Stat</th>
-              <th>Team</th>
+              <th>{isAll ? "All players" : "Team"}</th>
               <th>Club</th>
-              {players.map((p) => (
-                <th key={p.id}>{p.displayName || p.username}</th>
-              ))}
+              {!isAll &&
+                players.map((p) => (
+                  <th key={p.id}>{p.displayName || p.username}</th>
+                ))}
             </tr>
           </thead>
           <tbody>
@@ -320,9 +337,10 @@ export default async function CaptainPage({ searchParams }: { searchParams: { te
                 <td className="py-2 text-slate-300">{m.label}</td>
                 <td className="font-semibold">{formatMetric(m, teamAvg.values[m.key])}</td>
                 <td className="text-slate-400">{formatMetric(m, clubAvg.values[m.key])}</td>
-                {players.map((p) => (
-                  <td key={p.id}>{formatMetric(m, p.avg.values[m.key])}</td>
-                ))}
+                {!isAll &&
+                  players.map((p) => (
+                    <td key={p.id}>{formatMetric(m, p.avg.values[m.key])}</td>
+                  ))}
               </tr>
             ))}
           </tbody>

@@ -174,7 +174,7 @@ export default function AdminPage() {
             🗓️ Availability
           </Link>
           <Link href="/captain" className="btn-secondary">
-            🧢 Captain&apos;s dashboards
+            🧢 Team dashboards
           </Link>
           <Link href="/admin/balance-teams" className="btn-secondary">
             ⚖️ Balance tryout teams
