@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireApprovedUser } from "@/lib/session";
+import { requireApprovedUser } from "@/lib/session";
+import { CAPTAIN_EVENT_TYPES, canManageEvent, captainDayTaken } from "@/lib/captain";
 import { audienceSchema, visibleEventsWhere } from "@/lib/eventAudience";
 import { deleteEventMessages, quietly, refreshEventMessages } from "@/lib/discord";
 
@@ -25,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   });
 
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(event);
+  return NextResponse.json({ ...event, canManage: await canManageEvent(user, event.id) });
 }
 
 const schema = z.object({
@@ -40,8 +41,11 @@ const schema = z.object({
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApprovedUser();
+  if (!user || !(await canManageEvent(user, params.id))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const isAdmin = user.role === "ADMIN";
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -53,6 +57,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   const data = parsed.data;
+  if (!isAdmin) {
+    // A captain's event stays a team event, of a type captains can schedule,
+    // and one a day.
+    delete data.forEveryone;
+    delete data.teamIds;
+    if (data.type !== undefined && !(CAPTAIN_EVENT_TYPES as readonly string[]).includes(data.type)) {
+      return NextResponse.json({ error: "Captains can schedule practices, scrims, matches and tournaments." }, { status: 400 });
+    }
+    if (data.startTime !== undefined) {
+      const team = await prisma.team.findUnique({ where: { captainId: user.id }, select: { id: true } });
+      const clash = team && (await captainDayTaken(user.id, team.id, new Date(data.startTime), params.id));
+      if (clash) {
+        return NextResponse.json({ error: `You already scheduled "${clash}" that day. Captains can schedule one event a day.` }, { status: 400 });
+      }
+    }
+  }
   if (data.forEveryone === false && !data.teamIds?.length) {
     return NextResponse.json({ error: "Pick at least one team, or choose Everyone." }, { status: 400 });
   }
@@ -79,8 +99,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApprovedUser();
+  if (!user || !(await canManageEvent(user, params.id))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   await quietly("delete event posts", () => deleteEventMessages(params.id));
   await prisma.event.delete({ where: { id: params.id } });

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireApprovedUser } from "@/lib/session";
+import { requireApprovedUser } from "@/lib/session";
+import { canManageEvent } from "@/lib/captain";
 import { visibleEventsWhere } from "@/lib/eventAudience";
 import { nameWithTag } from "@/lib/format";
 import { balanceGap, generateGames, ratingMap, type RatedPlayer } from "@/lib/tryoutGames";
 
-// The event's game roster. Admins build and rebalance it; players see it once
-// it's shared.
+// The event's game roster. Admins (and the team captain, on events they
+// scheduled) build and rebalance it; players see it once it's shared.
 
 const playerSelect = {
   id: true,
@@ -29,20 +30,20 @@ function rated(u: { id: string; rank2v2: number | null; rank3v3: number | null }
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const user = await requireApprovedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const isAdmin = user.role === "ADMIN";
+  const canManage = await canManageEvent(user, params.id);
 
   const event = await prisma.event.findFirst({
     where: { id: params.id, ...(await visibleEventsWhere(user)) },
     include: { games: { orderBy: { number: "asc" } }, rsvps: { select: { userId: true, status: true } } },
   });
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!isAdmin && !event.rosterShared) return NextResponse.json({ shared: false, games: [] });
+  if (!canManage && !event.rosterShared) return NextResponse.json({ shared: false, games: [] });
 
   const inGames = event.games.flatMap((g) => [...g.blueIds, ...g.orangeIds]);
   const ids = new Set([...event.rosterPool, ...inGames]);
-  // Admins pick from every approved player, so walk-ins can be added.
+  // Managers pick from every approved player, so walk-ins can be added.
   const people = await prisma.user.findMany({
-    where: isAdmin
+    where: canManage
       ? { OR: [{ status: "APPROVED", isPlayer: true }, { id: { in: [...ids] } }] }
       : { id: { in: [...ids] } },
     select: playerSelect,
@@ -89,11 +90,11 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       played: g.played,
       blueGoals: g.blueGoals,
       orangeGoals: g.orangeGoals,
-      ...(isAdmin && { gap: Math.round(balanceGap(g, rating)) }),
+      ...(canManage && { gap: Math.round(balanceGap(g, rating)) }),
     })),
     sittingOut,
     plays: Object.fromEntries(plays),
-    ...(isAdmin && {
+    ...(canManage && {
       pool: event.rosterPool,
       candidates: people.map((p) => ({
         id: p.id,
@@ -124,8 +125,10 @@ const schema = z.discriminatedUnion("action", [
 ]);
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireApprovedUser();
+  if (!user || !(await canManageEvent(user, params.id))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

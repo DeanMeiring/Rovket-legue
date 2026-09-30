@@ -46,6 +46,7 @@ type EventDetail = {
   audienceTeams: { id: string; name: string }[];
   rsvps: Rsvp[];
   performances: Performance[];
+  canManage: boolean;
 };
 
 const emptyForm = {
@@ -242,11 +243,13 @@ export default function EventDetailPage() {
             </p>
             <p className="text-sm text-slate-500 mt-1">For: {audienceLabel(event)}</p>
           </div>
-          {isAdmin && (
+          {event.canManage && (
             <div className="flex gap-2 flex-wrap">
-              <button onClick={() => setResendOpen((o) => !o)} className="btn-secondary">
-                Resend
-              </button>
+              {isAdmin && (
+                <button onClick={() => setResendOpen((o) => !o)} className="btn-secondary">
+                  Resend
+                </button>
+              )}
               <Link href={`/events/${event.id}/edit`} className="btn-secondary">
                 Edit event
               </Link>
@@ -305,7 +308,7 @@ export default function EventDetailPage() {
       <div className="card">
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <h2 className="font-bold text-lg">RSVPs</h2>
-          {isAdmin && (
+          {event.canManage && (
             <button onClick={toggleRsvps} className="btn-secondary !py-1 !px-3 text-sm">
               {event.rsvpOpen ? "Close RSVPs" : "Open RSVPs"}
             </button>
@@ -325,7 +328,7 @@ export default function EventDetailPage() {
         </ul>
       </div>
 
-      <EventRoster eventId={event.id} eventTitle={event.title} isAdmin={isAdmin} myId={session?.user.id} />
+      <EventRoster eventId={event.id} eventTitle={event.title} canManage={event.canManage} myId={session?.user.id} />
 
       <ReplayStatsCard
         players={groupByPlayer(event.performances).map((g) => ({

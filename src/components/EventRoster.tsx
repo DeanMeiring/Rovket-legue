@@ -36,12 +36,12 @@ const GAP_WARN = 50;
 export default function EventRoster({
   eventId,
   eventTitle,
-  isAdmin,
+  canManage,
   myId,
 }: {
   eventId: string;
   eventTitle: string;
-  isAdmin: boolean;
+  canManage: boolean;
   myId?: string;
 }) {
   const [roster, setRoster] = useState<Roster | null>(null);
@@ -149,7 +149,7 @@ export default function EventRoster({
   }
 
   if (!roster) return null;
-  if (!isAdmin && (!roster.shared || !roster.games.length)) return null;
+  if (!canManage && (!roster.shared || !roster.games.length)) return null;
 
   const rounds = [...new Set(roster.games.map((g) => g.round))];
   const hasPlayed = roster.games.some((g) => g.played);
@@ -161,7 +161,7 @@ export default function EventRoster({
     <div className="card">
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <h2 className="font-bold text-lg">Game roster</h2>
-        {isAdmin && roster.games.length > 0 && (
+        {canManage && roster.games.length > 0 && (
           <div className="flex gap-2 flex-wrap">
             <button onClick={copy} className="btn-secondary !py-1 !px-3 text-sm">
               Copy as text
@@ -177,7 +177,7 @@ export default function EventRoster({
         )}
       </div>
 
-      {isAdmin && (
+      {canManage && (
         <div className="mb-4 space-y-3">
           {roster.games.length > 0 && (
             <p className="text-sm text-slate-400">
@@ -295,13 +295,13 @@ export default function EventRoster({
               {roster.games
                 .filter((g) => g.round === round)
                 .map((g) => (
-                  <GameRow key={g.id} game={g} isAdmin={isAdmin} myId={myId} onSave={(body) => put(body)} />
+                  <GameRow key={g.id} game={g} canManage={canManage} myId={myId} onSave={(body) => put(body)} />
                 ))}
             </div>
           </div>
         );
       })}
-      {isAdmin && hasPlayed && (
+      {canManage && hasPlayed && (
         <p className="text-xs text-slate-500">Untick “Played” on a game to let a rebalance change it again.</p>
       )}
     </div>
@@ -336,12 +336,12 @@ function perPlayer(roster: Roster, rounds: number[]) {
 
 function GameRow({
   game,
-  isAdmin,
+  canManage,
   myId,
   onSave,
 }: {
   game: Game;
-  isAdmin: boolean;
+  canManage: boolean;
   myId?: string;
   onSave: (body: object) => Promise<unknown>;
 }) {
@@ -363,11 +363,11 @@ function GameRow({
       <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
         <span className="font-semibold">Game {game.number}</span>
         <span className="flex items-center gap-3 text-xs text-slate-400">
-          {isAdmin && game.gap !== undefined && (
+          {canManage && game.gap !== undefined && (
             <span className={game.gap > GAP_WARN ? "text-yellow-300" : undefined}>gap {game.gap} MMR</span>
           )}
-          {!isAdmin && game.played && <span>Played</span>}
-          {(game.blueGoals != null || game.orangeGoals != null) && !isAdmin && (
+          {!canManage && game.played && <span>Played</span>}
+          {(game.blueGoals != null || game.orangeGoals != null) && !canManage && (
             <span>
               {game.blueGoals ?? 0} – {game.orangeGoals ?? 0}
             </span>
@@ -382,7 +382,7 @@ function GameRow({
           <span className="text-orange-400">Orange:</span> {names(game.orange)}
         </p>
       </div>
-      {isAdmin && (
+      {canManage && (
         <div className="flex items-center gap-3 mt-2 flex-wrap">
           <label className="flex items-center gap-2 text-xs">
             <input

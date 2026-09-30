@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { format } from "date-fns";
+import { canManageEvent, useCaptainTeam } from "@/components/useCaptainTeam";
 import {
   EVENT_TYPE_COLOR,
   EVENT_TYPE_LABEL,
@@ -27,6 +28,7 @@ type EventItem = {
   forEveryone: boolean;
   audienceTeams: { id: string; name: string }[];
   rsvps: Rsvp[];
+  createdById: string;
   createdBy: { displayName: string | null; username: string };
 };
 
@@ -36,6 +38,8 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const isAdmin = session?.user.role === "ADMIN";
+  const captainTeam = useCaptainTeam();
+  const manages = (ev: EventItem) => canManageEvent(ev, { isAdmin, myId: session?.user.id, team: captainTeam });
 
   async function load() {
     setLoading(true);
@@ -83,7 +87,7 @@ export default function EventsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Events</h1>
-        {isAdmin && (
+        {(isAdmin || captainTeam) && (
           <Link href="/events/new" className="btn-primary">
             + New event
           </Link>
@@ -155,7 +159,7 @@ export default function EventsPage() {
                   ) : (
                     <span className="text-xs text-slate-400">RSVPs open once teams are confirmed</span>
                   )}
-                  {isAdmin && (
+                  {manages(ev) && (
                     <button
                       disabled={updating === ev.id}
                       onClick={() => setRsvpOpen(ev.id, !ev.rsvpOpen)}
@@ -164,7 +168,7 @@ export default function EventsPage() {
                       {ev.rsvpOpen ? "Close RSVPs" : "Open RSVPs"}
                     </button>
                   )}
-                  {isAdmin && (
+                  {manages(ev) && (
                     <div className="flex gap-2 mt-1">
                       <Link href={`/events/${ev.id}`} className="text-xs text-accent2 hover:underline">
                         Manage

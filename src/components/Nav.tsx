@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { useCaptainTeam } from "@/components/useCaptainTeam";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -18,6 +19,8 @@ export default function Nav() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // The Captain's dashboard link only shows for a team's captain.
+  const captainTeam = useCaptainTeam();
 
   // Close the menu after navigating.
   useEffect(() => setOpen(false), [pathname]);
@@ -32,7 +35,11 @@ export default function Nav() {
 
   if (!session) return null;
   const isAdmin = session.user.role === "ADMIN";
-  const allLinks = isAdmin ? [...links, { href: "/admin", label: "Admin" }] : links;
+  const allLinks = [
+    ...links,
+    ...(captainTeam ? [{ href: "/captain", label: "Captain" }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
+  ];
 
   const linkClass = (href: string, extra = "") =>
     `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${extra} ${

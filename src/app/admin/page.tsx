@@ -6,7 +6,13 @@ import { useSession } from "next-auth/react";
 import { preciseRankLabel } from "@/lib/ranks";
 import DiscordPanel from "@/components/DiscordPanel";
 
-type Team = { id: string; name: string; colorHex: string | null; members: { id: string }[] };
+type Team = {
+  id: string;
+  name: string;
+  colorHex: string | null;
+  captainId: string | null;
+  members: { id: string; displayName: string | null; username: string }[];
+};
 type UserRow = {
   id: string;
   username: string;
@@ -123,6 +129,16 @@ export default function AdminPage() {
     await load();
   }
 
+  async function setCaptain(teamId: string, captainId: string) {
+    const res = await fetch(`/api/teams/${teamId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ captainId: captainId || null }),
+    });
+    if (!res.ok) alert((await res.json().catch(() => null))?.error || "Couldn't set the captain.");
+    await load();
+  }
+
   async function removeTeam(id: string) {
     if (!confirm("Delete this team? Members will become unassigned.")) return;
     await fetch(`/api/teams/${id}`, { method: "DELETE" });
@@ -156,6 +172,9 @@ export default function AdminPage() {
           </Link>
           <Link href="/admin/availability" className="btn-secondary">
             🗓️ Availability
+          </Link>
+          <Link href="/captain" className="btn-secondary">
+            🧢 Captain&apos;s dashboards
           </Link>
           <Link href="/admin/balance-teams" className="btn-secondary">
             ⚖️ Balance tryout teams
@@ -222,7 +241,11 @@ export default function AdminPage() {
       </section>
 
       <section className="card">
-        <h2 className="font-bold text-lg mb-4">Teams</h2>
+        <h2 className="font-bold text-lg mb-1">Teams</h2>
+        <p className="text-sm text-slate-400 mb-4">
+          A captain can schedule their team&apos;s practices, scrims, matches and tournaments (one a day), run the
+          game roster on those, and sees the Captain&apos;s dashboard.
+        </p>
         <form onSubmit={createTeam} className="flex gap-2 mb-4">
           <input
             className="input"
@@ -236,13 +259,30 @@ export default function AdminPage() {
         </form>
         <ul className="space-y-2">
           {teams.map((t) => (
-            <li key={t.id} className="flex items-center justify-between text-sm">
+            <li key={t.id} className="flex items-center justify-between gap-3 flex-wrap text-sm">
               <span>
                 {t.name} <span className="text-slate-500">({t.members.length} players)</span>
               </span>
-              <button onClick={() => removeTeam(t.id)} className="text-red-400 hover:underline text-xs">
-                Delete
-              </button>
+              <span className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  Captain
+                  <select
+                    className="input !py-1 !w-auto text-sm"
+                    value={t.captainId ?? ""}
+                    onChange={(e) => setCaptain(t.id, e.target.value)}
+                  >
+                    <option value="">No captain</option>
+                    {t.members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName || m.username}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button onClick={() => removeTeam(t.id)} className="text-red-400 hover:underline text-xs">
+                  Delete
+                </button>
+              </span>
             </li>
           ))}
           {teams.length === 0 && <p className="text-slate-500 text-sm">No teams yet.</p>}
