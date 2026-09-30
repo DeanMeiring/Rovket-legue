@@ -19,7 +19,11 @@ export default function TeamChat() {
       .then((d) => setMessages(d.messages ?? []));
   }, []);
 
-  useEffect(() => end.current?.scrollIntoView({ block: "nearest" }), [messages, busy]);
+  // Braces matter: newer browsers return a promise from scrollIntoView, and
+  // React would try to call a returned value as the effect's cleanup.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, [messages, busy]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
