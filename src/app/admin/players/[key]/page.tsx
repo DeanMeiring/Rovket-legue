@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import Avatar from "@/components/Avatar";
 import { PlayerBenchmarkCard } from "@/components/ReplayStats";
+import ScopeSwitch from "@/components/ScopeSwitch";
 import { prisma } from "@/lib/prisma";
 import { averageStats, formatMetric, METRICS } from "@/lib/replayStats";
 import {
@@ -10,6 +11,7 @@ import {
   clubAverage,
   combos,
   loadScouting,
+  parseScope,
   personLabel,
   personStats,
   playstyle,
@@ -21,9 +23,17 @@ export const dynamic = "force-dynamic";
 const TREND = ["bpm", "speed", "behindBall", "mostBack", "mostForward"];
 
 // Everything the club knows about one player, for tryout decisions. Admins only.
-export default async function PlayerPortfolioPage({ params }: { params: { key: string } }) {
+export default async function PlayerPortfolioPage({
+  params,
+  searchParams,
+}: {
+  params: { key: string };
+  searchParams: { data?: string };
+}) {
   const key = decodeURIComponent(params.key);
-  const s = await loadScouting();
+  const scope = parseScope(searchParams.data);
+  const q = scope === "practice" ? "?data=practice" : "";
+  const s = await loadScouting(scope);
   const person = s.people.get(key);
   if (!person) notFound();
 
@@ -41,9 +51,10 @@ export default async function PlayerPortfolioPage({ params }: { params: { key: s
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <Link href="/admin/players" className="text-sm text-accent2 hover:underline">
+      <Link href={`/admin/players${q}`} className="text-sm text-accent2 hover:underline">
         ← All portfolios
       </Link>
+      <ScopeSwitch scope={scope} path={`/admin/players/${encodeURIComponent(key)}`} />
 
       <div className="card">
         <div className="flex items-center gap-4 flex-wrap">
@@ -85,8 +96,9 @@ export default async function PlayerPortfolioPage({ params }: { params: { key: s
           ))}
         </div>
         <p className="text-xs text-slate-500 mt-3">
-          {club} club game{club === 1 ? "" : "s"} and {record.games - club} tryout game
-          {record.games - club === 1 ? "" : "s"}.
+          {scope === "tryout"
+            ? `${club} game${club === 1 ? "" : "s"} from tryout events and ${record.games - club} from the Tryout games page.`
+            : `${club} game${club === 1 ? "" : "s"} from practices, scrims and matches.`}
         </p>
       </div>
 
@@ -159,7 +171,7 @@ export default async function PlayerPortfolioPage({ params }: { params: { key: s
               {partners.map((c) => (
                 <tr key={c.other.key} className="border-b border-border/50">
                   <td className="py-2 pr-3">
-                    <Link href={`/admin/players/${encodeURIComponent(c.other.key)}`} className="hover:text-white">
+                    <Link href={`/admin/players/${encodeURIComponent(c.other.key)}${q}`} className="hover:text-white">
                       {personLabel(c.other)}
                     </Link>
                   </td>

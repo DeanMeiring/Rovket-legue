@@ -1,52 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { preciseRankLabel } from "@/lib/ranks";
 import { summarize } from "@/lib/tryoutStats";
 import { coachingReference } from "@/lib/coachingReference";
 import { METRICS, averageStats, formatMetric } from "@/lib/replayStats";
+import { ClaudeError as ReviewError, askClaude } from "@/lib/claude";
 
-const MODEL = "claude-opus-5-5";
-
-export class ReviewError extends Error {}
-
-// One Claude call. No tools: everything it needs is in the prompt.
-async function ask(system: string, prompt: string): Promise<{ text: string; model: string }> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new ReviewError("AI reviews are off. Set ANTHROPIC_API_KEY in Railway to turn them on.");
-  }
-  const client = new Anthropic();
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
-
-  try {
-    const response = await client.beta.messages
-      .stream({
-        model: MODEL,
-        max_tokens: 32000,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-        thinking: { type: "adaptive" },
-        output_config: { effort: "medium" },
-        system,
-        messages,
-      })
-      .finalMessage();
-
-    if (response.stop_reason === "refusal") throw new ReviewError("The AI declined to write this.");
-    const text = response.content
-      .flatMap((b) => (b.type === "text" ? [b.text] : []))
-      .join("")
-      .trim();
-    if (!text) throw new ReviewError("The AI returned nothing.");
-    return { text, model: response.model };
-  } catch (err) {
-    if (err instanceof ReviewError) throw err;
-    if (err instanceof Anthropic.AuthenticationError) throw new ReviewError("ANTHROPIC_API_KEY is invalid.");
-    if (err instanceof Anthropic.RateLimitError) throw new ReviewError("The AI service is busy. Try again in a minute.");
-    if (err instanceof Anthropic.APIError) throw new ReviewError(`AI request failed (${err.status}).`);
-    throw err;
-  }
-}
+export { ReviewError };
 
 const REVIEW_SYSTEM = `You write player reviews for a university Rocket League club that plays 3v3 (Standard) only. The player reads the review on their own dashboard.
 Write to the player directly ("you"), warm but honest, like a good coach. Base every point on their numbers and the coaching reference, which is your only source for benchmarks, and name the number you are going on.
@@ -126,7 +86,7 @@ ${withMates}
 Game by game:
 ${lines.join("\n") || "none"}`;
 
-  const { text, model } = await ask(REVIEW_SYSTEM, prompt);
+  const { text, model } = await askClaude(REVIEW_SYSTEM, [{ role: "user", content: prompt }]);
   return prisma.playerReview.create({ data: { userId, text, model } });
 }
 

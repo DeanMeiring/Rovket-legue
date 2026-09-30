@@ -42,7 +42,15 @@ export function confidence(games: number): Confidence {
   return games >= 6 ? "solid" : games >= 3 ? "early" : "too few";
 }
 
-export async function loadScouting() {
+// Tryout data (tryout events plus the Tryout games page) and practice data
+// (every other event) are never mixed, so practice results can't sway tryouts.
+export type DataScope = "tryout" | "practice";
+
+export function parseScope(v: string | string[] | undefined): DataScope {
+  return v === "practice" ? "practice" : "tryout";
+}
+
+export async function loadScouting(scope: DataScope = "tryout") {
   const [users, tryoutPlayers, performances, tryoutStats] = await Promise.all([
     prisma.user.findMany({
       where: { status: "APPROVED", isPlayer: true },
@@ -59,10 +67,16 @@ export async function loadScouting() {
     }),
     prisma.tryoutPlayer.findMany({ where: { userId: null } }),
     prisma.performance.findMany({
-      where: { replayId: { not: null }, win: { not: null } },
+      where: {
+        replayId: { not: null },
+        win: { not: null },
+        event: scope === "tryout" ? { type: "TRYOUT" } : { type: { not: "TRYOUT" } },
+      },
       include: { event: { select: { title: true, startTime: true } } },
     }),
-    prisma.tryoutGameStat.findMany({ include: { game: { select: { number: true, updatedAt: true } } } }),
+    scope === "tryout"
+      ? prisma.tryoutGameStat.findMany({ include: { game: { select: { number: true, updatedAt: true } } } })
+      : Promise.resolve([]),
   ]);
 
   const people = new Map<string, Person>();
@@ -152,7 +166,7 @@ export async function loadScouting() {
     for (const m of members) appearances.push({ ...m, teamKeys: keys.filter((k) => k !== m.key) });
     teamList.push({ keys, won: members[0].won, gameId: members[0].gameId });
   }
-  return { people, appearances, teams: teamList };
+  return { scope, people, appearances, teams: teamList };
 }
 
 export type Scouting = Awaited<ReturnType<typeof loadScouting>>;
