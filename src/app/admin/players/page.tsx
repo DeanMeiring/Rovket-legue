@@ -1,12 +1,15 @@
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
-import { loadScouting, personLabel, personStats, playstyle } from "@/lib/scouting";
+import ScopeSwitch from "@/components/ScopeSwitch";
+import { loadScouting, parseScope, personLabel, personStats, playstyle } from "@/lib/scouting";
 
 export const dynamic = "force-dynamic";
 
 // Admin list of every player with a portfolio: club members and tryout players.
-export default async function PlayerPortfoliosPage() {
-  const s = await loadScouting();
+export default async function PlayerPortfoliosPage({ searchParams }: { searchParams: { data?: string } }) {
+  const scope = parseScope(searchParams.data);
+  const q = scope === "practice" ? "?data=practice" : "";
+  const s = await loadScouting(scope);
   const rows = [...s.people.values()]
     .map((p) => {
       const st = personStats(s, p.key);
@@ -21,13 +24,11 @@ export default async function PlayerPortfoliosPage() {
       </Link>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h1 className="text-3xl font-bold">Player portfolios</h1>
-        <Link href="/admin/chemistry" className="btn-secondary">
+        <Link href={`/admin/chemistry${q}`} className="btn-secondary">
           🧩 Chemistry and trio builder
         </Link>
       </div>
-      <p className="text-sm text-slate-400">
-        Admins only. Games count both club practices imported from ballchasing and tryout games.
-      </p>
+      <ScopeSwitch scope={scope} path="/admin/players" />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -45,7 +46,7 @@ export default async function PlayerPortfoliosPage() {
               <tr key={p.key} className="border-b border-border/50">
                 <td className="py-2 pr-3">
                   <Link
-                    href={`/admin/players/${encodeURIComponent(p.key)}`}
+                    href={`/admin/players/${encodeURIComponent(p.key)}${q}`}
                     className="flex items-center gap-2 hover:text-white"
                   >
                     <Avatar id={p.userId ?? p.key} name={p.name} version={p.avatarUpdatedAt?.toISOString()} size={28} />

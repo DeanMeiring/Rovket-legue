@@ -385,3 +385,21 @@ model Avatar {
   mime      String
   updatedAt DateTime @updatedAt
 }
+
+// The admins' shared working line-up for picking teams from tryouts. One row
+// ("main"); slots maps "team1".."team4" and "subs" to player keys (see
+// src/lib/scouting.ts).
+model TeamDraft {
+  id        String   @id
+  slots     Json
+  updatedAt DateTime @updatedAt
+}
+
+// Admins' conversation with Claude on the Team builder page.
+model TeamChatMessage {
+  id        String   @id @default(cuid())
+  role      String // "user" | "assistant"
+  text      String
+  authorId  String?
+  createdAt DateTime @default(now())
+}

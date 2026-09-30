@@ -1,9 +1,11 @@
 import Link from "next/link";
+import ScopeSwitch from "@/components/ScopeSwitch";
 import TrioBuilder from "@/components/TrioBuilder";
 import {
   CONFIDENCE_STYLE,
   combos,
   loadScouting,
+  parseScope,
   personLabel,
   personStats,
   playstyle,
@@ -15,8 +17,9 @@ export const dynamic = "force-dynamic";
 
 // Which players do well together, from every club and tryout game they shared
 // a team in, plus a trio builder. Admins only.
-export default async function ChemistryPage() {
-  const s = await loadScouting();
+export default async function ChemistryPage({ searchParams }: { searchParams: { data?: string } }) {
+  const scope = parseScope(searchParams.data);
+  const s = await loadScouting(scope);
   const pairs = combos(s, 2);
   const trios = combos(s, 3);
   const people = [...s.people.values()]
@@ -29,12 +32,13 @@ export default async function ChemistryPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <Link href="/admin/players" className="text-sm text-accent2 hover:underline">
+      <Link href={scope === "practice" ? "/admin/players?data=practice" : "/admin/players"} className="text-sm text-accent2 hover:underline">
         ← Player portfolios
       </Link>
       <h1 className="text-3xl font-bold">Chemistry</h1>
+      <ScopeSwitch scope={scope} path="/admin/chemistry" />
       <p className="text-sm text-slate-400">
-        Built from {s.teams.length} team line-up{s.teams.length === 1 ? "" : "s"} across club practices and tryout games.
+        Built from {s.teams.length} team line-up{s.teams.length === 1 ? "" : "s"} in this data.
         Labels: <span className={`badge ${CONFIDENCE_STYLE["too few"]}`}>too few</span> under 3 shared games,{" "}
         <span className={`badge ${CONFIDENCE_STYLE.early}`}>early</span> 3 to 5,{" "}
         <span className={`badge ${CONFIDENCE_STYLE.solid}`}>solid</span> 6 or more.

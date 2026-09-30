@@ -151,6 +151,9 @@ export default function AdminPage() {
           <Link href="/admin/chemistry" className="btn-secondary">
             🧩 Chemistry
           </Link>
+          <Link href="/admin/team-builder" className="btn-secondary">
+            🏗️ Team builder
+          </Link>
           <Link href="/admin/availability" className="btn-secondary">
             🗓️ Availability
           </Link>
