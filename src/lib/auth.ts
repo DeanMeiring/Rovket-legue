@@ -49,6 +49,25 @@ export const authOptions: AuthOptions = {
         token.username = (user as any).username;
         token.role = (user as any).role;
         token.status = (user as any).status;
+        return token;
+      }
+      // The cookie lasts weeks, so re-read approval and role on every request.
+      // Otherwise someone who signed up stays "waiting on approval" (or a
+      // removed admin keeps admin) until they sign out and back in.
+      if (token.id) {
+        const row = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { username: true, displayName: true, role: true, status: true },
+        });
+        if (!row) {
+          token.status = "REJECTED";
+          token.role = "PLAYER";
+        } else {
+          token.username = row.username;
+          token.name = row.displayName || row.username;
+          token.role = row.role;
+          token.status = row.status;
+        }
       }
       return token;
     },
