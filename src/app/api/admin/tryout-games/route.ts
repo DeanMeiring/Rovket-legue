@@ -3,20 +3,25 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { generateGames } from "@/lib/tryoutGames";
+import { loadTryoutEventGames } from "@/lib/tryoutEventGames";
 
 export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [players, games, evaluations] = await Promise.all([
+  const [players, games, evaluations, eventGames] = await Promise.all([
     prisma.tryoutPlayer.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.tryoutGame.findMany({ orderBy: { number: "asc" }, include: { stats: true } }),
     prisma.tryoutEvaluation.findMany({ orderBy: { createdAt: "desc" }, take: 5 }),
+    loadTryoutEventGames(),
   ]);
 
   return NextResponse.json({
     players,
+    eventPlayers: eventGames.extraPlayers,
     games,
+    eventGames: eventGames.games,
+    eventRows: eventGames.statRows,
     evaluations,
     ballchasingEnabled: !!process.env.BALLCHASING_API_KEY,
     aiEnabled: !!process.env.ANTHROPIC_API_KEY,

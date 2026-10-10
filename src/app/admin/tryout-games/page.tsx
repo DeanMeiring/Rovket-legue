@@ -19,10 +19,14 @@ type Game = {
   replayStatus: string | null;
   stats: (StatRow & { side: string })[];
 };
+type EventGame = { id: string; event: string; date: string; sides: { names: string[]; goals: number; won: boolean }[] };
 type Evaluation = { id: string; text: string; model: string; createdAt: string };
 type Data = {
   players: Player[];
   games: Game[];
+  eventGames: EventGame[];
+  eventRows: StatRow[];
+  eventPlayers: Player[];
   evaluations: Evaluation[];
   ballchasingEnabled: boolean;
   aiEnabled: boolean;
@@ -47,10 +51,16 @@ export default function TryoutGamesPage() {
     load();
   }, []);
 
-  const players = useMemo(() => new Map((data?.players ?? []).map((p) => [p.id, p])), [data]);
+  const players = useMemo(
+    () => new Map([...(data?.players ?? []), ...(data?.eventPlayers ?? [])].map((p) => [p.id, p])),
+    [data],
+  );
   const ratings = useMemo(() => ratingMap(data?.players ?? []), [data]);
-  const summaries = useMemo(() => summarize((data?.games ?? []).flatMap((g) => g.stats)), [data]);
-  const played = (data?.games ?? []).filter((g) => g.replayStatus === "ok").length;
+  const summaries = useMemo(
+    () => summarize([...(data?.games ?? []).flatMap((g) => g.stats), ...(data?.eventRows ?? [])]),
+    [data],
+  );
+  const played = (data?.games ?? []).filter((g) => g.replayStatus === "ok").length + (data?.eventGames.length ?? 0);
   const unplayed = (data?.games ?? []).filter((g) => !g.ballchasingId).length;
 
   const rounds = useMemo(() => {
@@ -201,41 +211,34 @@ export default function TryoutGamesPage() {
         </p>
       )}
 
-      {rounds.map(([round, games]) => {
-        const playing = new Set(games.flatMap((g) => [...g.blueIds, ...g.orangeIds]));
-        const sitting = data.players.filter((p) => !playing.has(p.id));
-        return (
-          <section key={round} className="space-y-2">
-            <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <h2 className="font-bold text-lg">Round {round}</h2>
-              <p className="text-xs text-slate-500">
-                {sitting.length ? `Sitting out: ${sitting.map((p) => p.tag).join(", ")}` : "Nobody sits out"}
-              </p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {games.map((g) => (
-                <GameCard
-                  key={g.id}
-                  game={g}
-                  tagOf={tagOf}
-                  avg={avg}
-                  busy={busy === g.id}
-                  canUpload={data.ballchasingEnabled}
-                  link={links[g.id] ?? ""}
-                  onLink={(v) => setLinks((l) => ({ ...l, [g.id]: v }))}
-                  onUpload={(file) => uploadReplay(g, file)}
-                  onRefresh={() => refresh(g)}
-                  players={data.players}
-                  otherIdsThisRound={
-                    new Set(games.filter((o) => o.id !== g.id).flatMap((o) => [...o.blueIds, ...o.orangeIds]))
-                  }
-                  onSave={(blue, orange) => saveGame(g, blue, orange)}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      {data.eventGames.length > 0 && (
+        <section className="card">
+          <h2 className="font-bold text-lg mb-1">
+            Played at tryout events ({data.eventGames.length} {data.eventGames.length === 1 ? "game" : "games"})
+          </h2>
+          <p className="text-slate-500 text-xs mb-3">
+            Replays imported on events of type Tryout, winners first. They count in the player stats and the AI evaluation below,
+            alongside any planned games further down that have a replay.
+          </p>
+          <ul className="space-y-1 text-sm">
+            {data.eventGames.map((g) => {
+              const [won, lost] = g.sides;
+              return (
+                <li key={g.id}>
+                  <span>
+                    <span className="text-green-400">{won.names.join(", ")}</span>{" "}
+                    <span className="tabular-nums font-semibold">
+                      {won.goals}–{lost.goals}
+                    </span>{" "}
+                    <span className="text-slate-300">{lost.names.join(", ")}</span>
+                    <span className="text-slate-500 text-xs"> · {g.event}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {summaries.length > 0 && (
         <section className="card">
@@ -287,6 +290,42 @@ export default function TryoutGamesPage() {
           </div>
         </section>
       )}
+
+      {rounds.map(([round, games]) => {
+        const playing = new Set(games.flatMap((g) => [...g.blueIds, ...g.orangeIds]));
+        const sitting = data.players.filter((p) => !playing.has(p.id));
+        return (
+          <section key={round} className="space-y-2">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <h2 className="font-bold text-lg">Round {round}</h2>
+              <p className="text-xs text-slate-500">
+                {sitting.length ? `Sitting out: ${sitting.map((p) => p.tag).join(", ")}` : "Nobody sits out"}
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {games.map((g) => (
+                <GameCard
+                  key={g.id}
+                  game={g}
+                  tagOf={tagOf}
+                  avg={avg}
+                  busy={busy === g.id}
+                  canUpload={data.ballchasingEnabled}
+                  link={links[g.id] ?? ""}
+                  onLink={(v) => setLinks((l) => ({ ...l, [g.id]: v }))}
+                  onUpload={(file) => uploadReplay(g, file)}
+                  onRefresh={() => refresh(g)}
+                  players={data.players}
+                  otherIdsThisRound={
+                    new Set(games.filter((o) => o.id !== g.id).flatMap((o) => [...o.blueIds, ...o.orangeIds]))
+                  }
+                  onSave={(blue, orange) => saveGame(g, blue, orange)}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
 
       <section className="card space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
