@@ -5,9 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { BallchasingReplay, fetchReplay, teamGoals, listGroupReplays, parseBallchasingLink } from "@/lib/ballchasing";
 
-const schema = z.object({
-  replayUrl: z.string().trim().min(1),
-});
+const schema = z.union([
+  z.object({ replayUrl: z.string().trim().min(1) }),
+  // Ids of replays the event page just uploaded to ballchasing.
+  z.object({ replayIds: z.array(z.string().regex(/^[\w-]+$/)).min(1).max(200) }),
+]);
 
 // Ballchasing allows about two requests a second on a free key.
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -22,7 +24,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Paste a ballchasing.com replay or group link." }, { status: 400 });
   }
 
-  const link = parseBallchasingLink(parsed.data.replayUrl);
+  const link =
+    "replayIds" in parsed.data
+      ? { kind: "upload" as const, id: "" }
+      : parseBallchasingLink(parsed.data.replayUrl);
   if (!link) {
     return NextResponse.json({ error: "That doesn't look like a ballchasing.com replay or group link." }, { status: 400 });
   }
@@ -32,7 +37,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   let replayIds: string[];
   try {
-    replayIds = link.kind === "group" ? (await listGroupReplays(link.id)).map((r) => r.id) : [link.id];
+    replayIds =
+      link.kind === "upload" && "replayIds" in parsed.data
+        ? [...new Set(parsed.data.replayIds)]
+        : link.kind === "group"
+          ? (await listGroupReplays(link.id)).map((r) => r.id)
+          : [link.id];
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Failed to read the group." }, { status: 502 });
   }
@@ -105,13 +115,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   let games = 0;
   let skipped = 0;
   const failed: string[] = [];
+  // Fresh uploads ballchasing hasn't finished reading yet; the page retries these.
+  const processing: string[] = [];
 
   for (const [i, replayId] of replayIds.entries()) {
     if (done.has(replayId)) {
       skipped++;
       continue;
     }
-    if (i > 0 && link.kind === "group") await wait(600);
+    if (i > 0 && link.kind !== "replay") await wait(600);
 
     let replay: BallchasingReplay;
     try {
@@ -130,7 +142,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
           { status: 409 },
         );
       }
-      failed.push(replay.title || replayId);
+      if (link.kind === "upload" && replay.status === "pending") processing.push(replayId);
+      else failed.push(replay.title || replayId);
       continue;
     }
 
@@ -201,6 +214,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     games,
     skipped,
     failed,
+    pending: processing,
   });
 }
 

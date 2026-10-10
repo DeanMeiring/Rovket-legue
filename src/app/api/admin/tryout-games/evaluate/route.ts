@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { preciseRankLabel } from "@/lib/ranks";
 import { summarize } from "@/lib/tryoutStats";
+import { loadTryoutEventGames } from "@/lib/tryoutEventGames";
 
 const MODEL = "claude-opus-5";
 
@@ -27,17 +28,19 @@ export async function POST() {
     );
   }
 
-  const [players, games] = await Promise.all([
+  const [boardPlayers, games, events] = await Promise.all([
     prisma.tryoutPlayer.findMany(),
     prisma.tryoutGame.findMany({ where: { replayStatus: "ok" }, orderBy: { number: "asc" }, include: { stats: true } }),
+    loadTryoutEventGames(),
   ]);
-  if (games.length === 0) {
+  const players = [...boardPlayers, ...events.extraPlayers];
+  if (games.length === 0 && events.games.length === 0) {
     return NextResponse.json({ error: "Import at least one replay first." }, { status: 400 });
   }
 
   const tag = new Map(players.map((p) => [p.id, p.tag]));
   const byId = new Map(players.map((p) => [p.id, p]));
-  const summaries = summarize(games.flatMap((g) => g.stats));
+  const summaries = summarize([...games.flatMap((g) => g.stats), ...events.statRows]);
   const r1 = (n: number | null) => (n == null ? "n/a" : n.toFixed(1));
 
   const playerLines = summaries.map((s) => {
@@ -60,6 +63,13 @@ export async function POST() {
         .map((st) => tag.get(st.playerId) ?? "?")
         .join(", ") || "unmatched players";
     return `Game ${g.number}: blue ${side("blue")} (${g.blueGoals ?? "?"}) vs orange ${side("orange")} (${g.orangeGoals ?? "?"})`;
+  });
+  // Games played at tryout events; ballchasing doesn't say which side was blue here.
+  events.games.forEach((g, i) => {
+    const [won, lost] = g.sides;
+    gameLines.push(
+      `${g.event} game ${i + 1}: ${won.names.join(", ")} (${won.goals}) beat ${lost.names.join(", ")} (${lost.goals})`,
+    );
   });
 
   const client = new Anthropic();

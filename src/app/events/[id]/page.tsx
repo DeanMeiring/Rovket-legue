@@ -78,7 +78,9 @@ export default function EventDetailPage() {
     games: number;
     skipped: number;
     failed: string[];
+    pending?: string[];
   } | null>(null);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [unmatchedCount, setUnmatchedCount] = useState(0);
   const [showUnmatched, setShowUnmatched] = useState(false);
@@ -209,6 +211,101 @@ export default function EventDetailPage() {
     setReplayUrl("");
     await load();
     if (data.unmatched?.length) setShowUnmatched(true);
+  }
+
+  // Reads .replay files (or zips of them), sends each to ballchasing through
+  // the app, then imports the stats once ballchasing has read them.
+  async function uploadReplays(list: FileList | null) {
+    if (!list?.length || importing) return;
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const problems: string[] = [];
+
+    const files: File[] = [];
+    for (const f of Array.from(list)) {
+      if (f.name.toLowerCase().endsWith(".zip")) {
+        setUploadNote(`Opening ${f.name}...`);
+        try {
+          const JSZip = (await import("jszip")).default;
+          const zip = await JSZip.loadAsync(f);
+          for (const entry of Object.values(zip.files)) {
+            const base = entry.name.split("/").pop() || "";
+            if (entry.dir || entry.name.includes("__MACOSX") || !base.toLowerCase().endsWith(".replay")) continue;
+            files.push(new File([await entry.async("blob")], base));
+          }
+        } catch {
+          problems.push(`${f.name}: couldn't open the zip`);
+        }
+      } else if (f.name.toLowerCase().endsWith(".replay")) {
+        files.push(f);
+      } else {
+        problems.push(`${f.name}: not a .replay or .zip file`);
+      }
+    }
+    if (!files.length) {
+      setImporting(false);
+      setUploadNote(null);
+      setImportError(problems.join(". ") || "No .replay files found.");
+      return;
+    }
+
+    const ids: string[] = [];
+    for (const [i, f] of files.entries()) {
+      setUploadNote(`Uploading ${i + 1} of ${files.length}...`);
+      const body = new FormData();
+      body.append("file", f);
+      for (let attempt = 0; ; attempt++) {
+        const res = await fetch(`/api/events/${params.id}/upload-replay`, { method: "POST", body }).catch(() => null);
+        const data = await res?.json().catch(() => ({}));
+        if (res?.ok && data?.id) {
+          ids.push(data.id);
+          break;
+        }
+        if (res?.status === 429 && attempt < 4) {
+          await wait(5000);
+          continue;
+        }
+        problems.push(`${f.name}: ${data?.error || "upload failed"}`);
+        break;
+      }
+    }
+
+    const total = { imported: new Set<string>(), unmatched: new Set<string>(), games: 0, skipped: 0, failed: [] as string[] };
+    let waiting = ids;
+    for (let round = 0; waiting.length && round < 8; round++) {
+      if (round > 0) await wait(10000);
+      setUploadNote(
+        round === 0
+          ? `Reading ${waiting.length} game${waiting.length === 1 ? "" : "s"}...`
+          : `Ballchasing is still reading ${waiting.length} game${waiting.length === 1 ? "" : "s"}, checking again...`,
+      );
+      const res = await fetch(`/api/events/${params.id}/import-replay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replayIds: waiting }),
+      }).catch(() => null);
+      const data = await res?.json().catch(() => ({}));
+      if (!res?.ok) {
+        problems.push(data?.error || "Importing the stats failed.");
+        break;
+      }
+      data.imported.forEach((n: string) => total.imported.add(n));
+      data.unmatched.forEach((n: string) => total.unmatched.add(n));
+      total.games += data.games;
+      total.skipped += data.skipped;
+      total.failed.push(...data.failed);
+      waiting = data.pending ?? [];
+    }
+    if (waiting.length) total.failed.push(...waiting);
+
+    setImporting(false);
+    setUploadNote(null);
+    setImportError(problems.length ? problems.join(". ") : null);
+    setImportResult({ ...total, imported: [...total.imported], unmatched: [...total.unmatched] });
+    await load();
+    if (total.unmatched.size) setShowUnmatched(true);
   }
 
   async function deletePerformance(id: string) {
@@ -431,7 +528,7 @@ export default function EventDetailPage() {
 
         {isAdmin && (
           <form onSubmit={importReplay} className="border-t border-border pt-4 space-y-2 mb-4">
-            <p className="label mb-0">Import stats from ballchasing.com</p>
+            <p className="label mb-0">Import game stats</p>
             <div className="flex gap-2">
               <input
                 className="input"
@@ -442,6 +539,25 @@ export default function EventDetailPage() {
               <button type="submit" disabled={importing} className="btn-secondary whitespace-nowrap">
                 {importing ? "Importing, this can take a minute..." : "Import"}
               </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className={`btn-secondary text-sm cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
+                Upload replay files
+                <input
+                  type="file"
+                  multiple
+                  accept=".replay,.zip"
+                  className="hidden"
+                  disabled={importing}
+                  onChange={(e) => {
+                    uploadReplays(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <span className="text-xs text-slate-500">
+                {uploadNote ?? "Pick the .replay files, or a zip of them, straight from your PC."}
+              </span>
             </div>
             {importError && <p className="text-red-400 text-sm">{importError}</p>}
             {importResult && (
@@ -472,7 +588,8 @@ export default function EventDetailPage() {
               Clear imported stats and start fresh
             </button>
             <p className="text-xs text-slate-500">
-              Paste one replay, or the whole group after the event to pull every game in it. Players are
+              Upload the replay files, or paste one replay or the whole ballchasing group after the event.
+              Uploads go to ballchasing for you, privately. Players are
               matched by in-game name to their username, display name or tryout board tag. Importing a group
               again only adds the new replays.
             </p>
