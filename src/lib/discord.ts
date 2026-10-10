@@ -68,6 +68,13 @@ export async function quietly(label: string, fn: () => Promise<unknown>) {
   }
 }
 
+// Sends a private message from the bot. Fails when the player has closed DMs
+// from server members, which the caller should treat as "not delivered".
+export async function sendDirectMessage(discordId: string, content: string) {
+  const dm = await api<{ id: string }>("POST", "/users/@me/channels", { recipient_id: discordId });
+  await api("POST", `/channels/${dm.id}/messages`, { content: content.slice(0, 2000), allowed_mentions: { parse: [] } });
+}
+
 // ---- Request signatures ------------------------------------------------
 
 // Discord signs every interaction with Ed25519; anything unsigned is rejected.
