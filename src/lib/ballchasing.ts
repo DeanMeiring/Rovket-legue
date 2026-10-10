@@ -84,6 +84,13 @@ function groupId(): string | null {
   return raw.replace(/\/+$/, "").split("/").pop() || null;
 }
 
+// Ballchasing limits how fast a key can upload; the caller should wait and retry.
+export class BallchasingBusy extends Error {
+  constructor() {
+    super("Ballchasing is busy, try again in a few seconds.");
+  }
+}
+
 // Uploads a .replay file and returns its ballchasing id. A replay that was
 // already uploaded (409) returns the existing id, so re-uploading is harmless.
 export async function uploadReplay(file: Blob, filename: string): Promise<string> {
@@ -92,7 +99,7 @@ export async function uploadReplay(file: Blob, filename: string): Promise<string
   const params = new URLSearchParams({ visibility: "private" });
   const group = groupId();
   if (group) params.set("group", group);
-  const res = await fetch(`https://ballchasing.com/api/v2/upload?${params}`, {
+  const res = await fetch(`${API}/v2/upload?${params}`, {
     method: "POST",
     headers: { Authorization: apiKeyOrThrow() },
     body: form,
@@ -100,6 +107,7 @@ export async function uploadReplay(file: Blob, filename: string): Promise<string
   const data = await res.json().catch(() => ({}));
   if ((res.status === 201 || res.status === 409) && data.id) return data.id as string;
   if (res.status === 401) throw new Error("Ballchasing API key is invalid.");
+  if (res.status === 429) throw new BallchasingBusy();
   throw new Error(data.error ? `Ballchasing rejected the upload: ${data.error}` : `Ballchasing upload failed (${res.status}).`);
 }
 
