@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { preciseRankLabel } from "@/lib/ranks";
 import DiscordPanel from "@/components/DiscordPanel";
+import TeamAnnouncements from "@/components/TeamAnnouncements";
 
 type Team = {
   id: string;
@@ -44,6 +45,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [newTeamName, setNewTeamName] = useState("");
   const [adminError, setAdminError] = useState<string | null>(null);
+  // Bumped on every reload so the team announcement list sees team changes.
+  const [announceKey, setAnnounceKey] = useState(0);
   const { data: session } = useSession();
 
   async function load() {
@@ -52,6 +55,7 @@ export default function AdminPage() {
     if (uRes.ok) setUsers(await uRes.json());
     if (tRes.ok) setTeams(await tRes.json());
     setLoading(false);
+    setAnnounceKey((k) => k + 1);
   }
 
   useEffect(() => {
@@ -288,6 +292,8 @@ export default function AdminPage() {
           {teams.length === 0 && <p className="text-slate-500 text-sm">No teams yet.</p>}
         </ul>
       </section>
+
+      <TeamAnnouncements refresh={announceKey} />
 
       <DiscordPanel />
 
