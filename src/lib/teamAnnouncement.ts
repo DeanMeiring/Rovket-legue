@@ -32,7 +32,7 @@ export function teamMessage(player: Person, team: { name: string; captain: Perso
     lines: [
       `Congrats ${first}, you made ${team.name}!`,
       captain?.id === player.id
-        ? `You're the team captain. You can schedule your team's practices, scrims and matches from the Captain tab.`
+        ? `You're the team captain. You can schedule your team's practices, scrims and matches from the Teams tab.`
         : captain
           ? `Your team captain is ${nameOf(captain)}.`
           : "Your team captain will be announced soon.",

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { preciseRankLabel } from "@/lib/ranks";
+import { audienceLabel, EVENT_TYPE_COLOR, EVENT_TYPE_LABEL, formatEventWhen } from "@/lib/format";
 import DiscordPanel from "@/components/DiscordPanel";
 import TeamAnnouncements from "@/components/TeamAnnouncements";
 
@@ -33,6 +34,17 @@ type UserRow = {
   discordId: string | null;
 };
 
+type WeekEvent = {
+  id: string;
+  title: string;
+  type: string;
+  startTime: string;
+  endTime: string | null;
+  forEveryone: boolean;
+  audienceTeams: { name: string }[];
+  rsvps: { status: string }[];
+};
+
 const RANK_FIELDS = [
   { key: "rank1v1" as const, label: "1s" },
   { key: "rank2v2" as const, label: "2s" },
@@ -42,6 +54,7 @@ const RANK_FIELDS = [
 export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [week, setWeek] = useState<WeekEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTeamName, setNewTeamName] = useState("");
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -51,9 +64,22 @@ export default function AdminPage() {
 
   async function load() {
     setLoading(true);
-    const [uRes, tRes] = await Promise.all([fetch("/api/admin/users"), fetch("/api/teams")]);
+    const [uRes, tRes, eRes] = await Promise.all([fetch("/api/admin/users"), fetch("/api/teams"), fetch("/api/events")]);
     if (uRes.ok) setUsers(await uRes.json());
     if (tRes.ok) setTeams(await tRes.json());
+    if (eRes.ok) {
+      // Anything still running or starting in the next 7 days.
+      const now = Date.now();
+      const soon = now + 7 * 24 * 60 * 60 * 1000;
+      const events: WeekEvent[] = await eRes.json();
+      setWeek(
+        events.filter((ev) => {
+          const start = new Date(ev.startTime).getTime();
+          const end = new Date(ev.endTime ?? ev.startTime).getTime();
+          return end >= now && start <= soon;
+        }),
+      );
+    }
     setLoading(false);
     setAnnounceKey((k) => k + 1);
   }
@@ -158,48 +184,78 @@ export default function AdminPage() {
   const rejected = users.filter((u) => u.status === "REJECTED");
 
   return (
-    <div className="space-y-10 max-w-4xl">
+    <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-3xl font-bold">Admin panel</h1>
-        <div className="flex gap-2 flex-wrap">
-          <Link href="/admin/tryout-board" className="btn-secondary">
-            📋 Tryout board
-          </Link>
-          <Link href="/admin/players" className="btn-secondary">
-            🗂️ Player portfolios
-          </Link>
-          <Link href="/admin/chemistry" className="btn-secondary">
-            🧩 Chemistry
-          </Link>
-          <Link href="/admin/team-builder" className="btn-secondary">
-            🏗️ Team builder
-          </Link>
-          <Link href="/admin/availability" className="btn-secondary">
-            🗓️ Availability
-          </Link>
-          <Link href="/captain" className="btn-secondary">
-            🧢 Team dashboards
-          </Link>
-          <Link href="/admin/balance-teams" className="btn-secondary">
-            ⚖️ Balance tryout teams
-          </Link>
-          <Link href="/admin/coaching-reference" className="btn-secondary">
-            📚 Coaching reference
-          </Link>
-          <Link href="/events/new" className="btn-primary">
-            + New event
-          </Link>
-        </div>
+        <Link href="/events/new" className="btn-primary">
+          + New event
+        </Link>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <Link href="/teams" className="btn-secondary">
+          🧢 Team dashboards
+        </Link>
+        <Link href="/admin/players" className="btn-secondary">
+          🗂️ Player portfolios
+        </Link>
+        <Link href="/admin/chemistry" className="btn-secondary">
+          🧩 Chemistry
+        </Link>
+        <Link href="/admin/availability" className="btn-secondary">
+          🗓️ Availability
+        </Link>
+        <Link href="/admin/coaching-reference" className="btn-secondary">
+          📚 Coaching reference
+        </Link>
+        <Link href="/admin/tryouts" className="btn-secondary text-slate-400">
+          🗄️ Tryouts archive
+        </Link>
       </div>
 
       {loading && <p className="text-slate-500">Loading...</p>}
+
+      <section className="card">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="font-bold text-lg">This week</h2>
+          <Link href="/events" className="text-sm text-accent2 hover:underline">
+            All events
+          </Link>
+        </div>
+        {week.length === 0 ? (
+          <p className="text-slate-500 text-sm">Nothing scheduled in the next 7 days.</p>
+        ) : (
+          <ul className="space-y-2">
+            {week.map((ev) => (
+              <li key={ev.id} className="flex items-center justify-between gap-3 flex-wrap text-sm">
+                <span>
+                  <span className={`badge ${EVENT_TYPE_COLOR[ev.type]} mr-2`}>{EVENT_TYPE_LABEL[ev.type]}</span>
+                  <Link href={`/events/${ev.id}`} className="font-medium hover:underline">
+                    {ev.title}
+                  </Link>
+                  <span className="text-slate-500"> · {audienceLabel(ev)}</span>
+                </span>
+                <span className="text-slate-400">
+                  {formatEventWhen(ev.startTime, ev.endTime)} · {ev.rsvps.filter((r) => r.status === "GOING").length} going
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {unlinked.length > 0 && (
+          <p className="text-xs text-slate-500 mt-3">
+            {unlinked.length} player{unlinked.length === 1 ? " hasn't" : "s haven't"} linked Discord yet, so they miss
+            the event pings. See &quot;Not linked to Discord&quot; below.
+          </p>
+        )}
+      </section>
 
       <section className="card">
         <h2 className="font-bold text-lg mb-1">
           Pending approvals {pending.length > 0 && <span className="badge bg-accent/20 text-accent">{pending.length}</span>}
         </h2>
         <p className="text-slate-500 text-sm mb-4">
-          Review tryout signups, then approve and assign them to a team.
+          Review signups, then approve and assign them to a team.
         </p>
         {pending.length === 0 && <p className="text-slate-500 text-sm">Nothing pending.</p>}
         <ul className="space-y-3">
@@ -248,7 +304,7 @@ export default function AdminPage() {
         <h2 className="font-bold text-lg mb-1">Teams</h2>
         <p className="text-sm text-slate-400 mb-4">
           A captain can schedule their team&apos;s practices, scrims, matches and tournaments (one a day), run the
-          game roster on those, and sees the Captain&apos;s dashboard.
+          game roster on those, and can edit their team&apos;s page under Teams.
         </p>
         <form onSubmit={createTeam} className="flex gap-2 mb-4">
           <input
@@ -295,13 +351,12 @@ export default function AdminPage() {
 
       <TeamAnnouncements refresh={announceKey} />
 
-      <DiscordPanel />
+      <Fold title="Discord setup">
+        <DiscordPanel />
+      </Fold>
 
+      <Fold title="Not linked to Discord" count={unlinked.length}>
       <section className="card">
-        <h2 className="font-bold text-lg mb-1">
-          Not linked to Discord{" "}
-          {unlinked.length > 0 && <span className="badge bg-accent/20 text-accent">{unlinked.length}</span>}
-        </h2>
         <p className="text-sm text-slate-400 mb-3">
           Approved players who haven&apos;t run /link in Discord yet. They don&apos;t get their team role, event buttons or
           reminders there until they do.
@@ -321,9 +376,10 @@ export default function AdminPage() {
           </ul>
         )}
       </section>
+      </Fold>
 
+      <Fold title="Approved players" count={approved.length}>
       <section className="card">
-        <h2 className="font-bold text-lg mb-4">Approved players ({approved.length})</h2>
         <div className="space-y-3">
           {approved.map((u) => (
             <div key={u.id} className="flex items-center justify-between gap-4 flex-wrap border-b border-border/60 pb-3">
@@ -409,9 +465,10 @@ export default function AdminPage() {
           ))}
         </div>
       </section>
+      </Fold>
 
+      <Fold title="Admin accounts" count={admins.length}>
       <section className="card">
-        <h2 className="font-bold text-lg mb-1">Admin accounts ({admins.length})</h2>
         <p className="text-slate-500 text-sm mb-4">
           {iAmMain
             ? "Choose which admins get an email when someone signs up or uses their invite link."
@@ -449,9 +506,10 @@ export default function AdminPage() {
         </ul>
         {adminError && <p className="text-red-400 text-sm mt-3">{adminError}</p>}
       </section>
+      </Fold>
 
+      <Fold title="Staff admins and Add admin" count={staff.length}>
       <section className="card">
-        <h2 className="font-bold text-lg mb-1">Staff admins ({staff.length})</h2>
         <p className="text-slate-500 text-sm mb-4">
           Admins who run the site but don&apos;t play. They don&apos;t appear on the roster, in availability, RSVP lists
           or team balancing.
@@ -491,10 +549,11 @@ export default function AdminPage() {
         </ul>
         <AddAdminForm onAdded={load} />
       </section>
+      </Fold>
 
       {rejected.length > 0 && (
+        <Fold title="Rejected" count={rejected.length}>
         <section className="card">
-          <h2 className="font-bold text-lg mb-4">Rejected ({rejected.length})</h2>
           <ul className="space-y-2">
             {rejected.map((u) => (
               <li key={u.id} className="flex items-center justify-between text-sm">
@@ -511,8 +570,25 @@ export default function AdminPage() {
             ))}
           </ul>
         </section>
+        </Fold>
       )}
     </div>
+  );
+}
+
+// A closed-by-default section, so the panel opens on what needs doing this week.
+function Fold({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
+  return (
+    <details className="group">
+      <summary className="card cursor-pointer list-none flex items-center justify-between gap-3 group-open:mb-3">
+        <span className="font-bold text-lg">
+          {title} {count !== undefined && <span className="text-slate-500 font-normal">({count})</span>}
+        </span>
+        <span className="text-sm text-accent2 group-open:hidden">Show</span>
+        <span className="text-sm text-accent2 hidden group-open:inline">Hide</span>
+      </summary>
+      {children}
+    </details>
   );
 }
 

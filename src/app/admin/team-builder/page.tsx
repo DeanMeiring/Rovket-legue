@@ -27,8 +27,8 @@ export default async function TeamBuilderPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <Link href="/admin" className="text-sm text-accent2 hover:underline">
-        ← Back to admin
+      <Link href="/admin/tryouts" className="text-sm text-accent2 hover:underline">
+        ← Tryouts archive
       </Link>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h1 className="text-3xl font-bold">Team builder</h1>

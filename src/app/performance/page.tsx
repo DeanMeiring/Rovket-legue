@@ -84,7 +84,7 @@ export default function MyPerformancePage() {
 
   return (
     <div className="space-y-8 max-w-3xl">
-      <h1 className="text-3xl font-bold">My Performance</h1>
+      <h1 className="text-3xl font-bold">My stats</h1>
 
       <div className="card">
         <div className="flex items-center justify-between mb-1">
