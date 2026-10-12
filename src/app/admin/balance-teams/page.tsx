@@ -85,8 +85,8 @@ export default function BalanceTeamsPage() {
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
-        <Link href="/admin" className="text-sm text-accent2 hover:underline">
-          ← Back to admin panel
+        <Link href="/admin/tryouts" className="text-sm text-accent2 hover:underline">
+          ← Tryouts archive
         </Link>
         <h1 className="text-3xl font-bold mt-2">Balance tryout teams</h1>
         <p className="text-slate-400 mt-1">

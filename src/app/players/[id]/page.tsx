@@ -203,8 +203,8 @@ export default function PlayerProfilePage() {
 
   return (
     <div className="space-y-8 max-w-3xl">
-      <Link href="/players" className="text-sm text-accent2 hover:underline">
-        ← Back to roster
+      <Link href="/teams?team=all" className="text-sm text-accent2 hover:underline">
+        ← Back to Teams
       </Link>
 
       <div className="card">

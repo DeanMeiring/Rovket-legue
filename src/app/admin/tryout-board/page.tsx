@@ -201,8 +201,8 @@ export default function TryoutBoardPage() {
     <div className="space-y-8 max-w-5xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <Link href="/admin" className="text-sm text-slate-500 hover:underline">
-            ← Admin panel
+          <Link href="/admin/tryouts" className="text-sm text-slate-500 hover:underline">
+            ← Tryouts archive
           </Link>
           <h1 className="text-3xl font-bold">Tryout board</h1>
           <p className="text-slate-500 text-sm mt-1">

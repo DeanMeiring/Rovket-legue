@@ -101,7 +101,7 @@ export default function EventForm({
       return;
     }
 
-    router.push(mode === "edit" ? `/events/${eventId}` : asCaptain ? "/captain" : "/events");
+    router.push(mode === "edit" ? `/events/${eventId}` : asCaptain ? "/teams" : "/events");
     router.refresh();
   }
 

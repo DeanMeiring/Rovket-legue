@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useCaptainTeam } from "@/components/useCaptainTeam";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard", label: "Home" },
   { href: "/events", label: "Events" },
+  { href: "/teams", label: "Teams" },
+  { href: "/performance", label: "My stats" },
   { href: "/availability", label: "Availability" },
-  { href: "/players", label: "Roster" },
-  { href: "/performance", label: "My Performance" },
 ];
 
 // Top bar on desktop; on phones the links move into a slide-out menu.
@@ -19,8 +18,6 @@ export default function Nav() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  // The Captain's dashboard link only shows for a team's captain.
-  const captainTeam = useCaptainTeam();
 
   // Close the menu after navigating.
   useEffect(() => setOpen(false), [pathname]);
@@ -35,12 +32,7 @@ export default function Nav() {
 
   if (!session) return null;
   const isAdmin = session.user.role === "ADMIN";
-  const allLinks = [
-    ...links,
-    // Admins get every team's dashboard; a captain gets their own.
-    ...(isAdmin ? [{ href: "/captain", label: "Teams" }] : captainTeam ? [{ href: "/captain", label: "Captain" }] : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
-  ];
+  const allLinks = [...links, ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : [])];
 
   const linkClass = (href: string, extra = "") =>
     `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${extra} ${
