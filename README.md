@@ -116,6 +116,31 @@ scratch, or to understand what's already there:
 5. Generate a public domain for the service and set `NEXTAUTH_URL` to it (must be set
    before the first real login attempt, since NextAuth uses it for callback URLs).
 
+### Letting the site sleep when nobody is using it (Railway Serverless)
+
+Railway's Serverless setting puts a service to sleep after 5 to 10 minutes with no
+outbound traffic, and the next visit wakes it. The in-app reminder check (every 5
+minutes, in `src/instrumentation.ts`) queries the database, which counts as outbound
+traffic, so the site never sleeps while it runs. To let it sleep:
+
+1. **web** service, Settings > Deploy: set the **Pre-deploy command** to
+   `npx prisma migrate deploy && npx tsx prisma/seed.ts` and the **Start command** to
+   `npm start`. Migrations and the admin seed then run once per deploy instead of on
+   every wake-up, which keeps cold starts short.
+2. **web** service, Variables: add `DISABLE_REMINDER_CRON=true`.
+3. Add a second service from this repo and branch (call it `reminders`). Start command
+   `npm run reminders`, Settings > Cron Schedule `*/5 * * * *`, and variables
+   `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `BREVO_API_KEY`, `EMAIL_FROM`,
+   `REMINDER_LEAD_HOURS` and the five `DISCORD_*` variables, referenced from `web`
+   (for example `${{web.DISCORD_BOT_TOKEN}}`). It runs
+   `scripts/send-reminders.ts`, which sends the Discord pings and reminder emails and
+   exits.
+4. **web** service, Settings > Deploy: turn on **Serverless**.
+
+The first visit after a sleep takes a few seconds longer. Discord gives the bot 3
+seconds to answer `/link` and RSVP buttons, so a press that wakes the site can show
+"This interaction failed"; pressing again works.
+
 ## Project structure
 
 - `prisma/schema.prisma` — data model (users, teams, events, RSVPs, performance).

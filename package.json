@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "TZ=${TZ:-Africa/Johannesburg} next start",
     "start:release": "prisma migrate deploy && tsx prisma/seed.ts && TZ=${TZ:-Africa/Johannesburg} next start",
+    "reminders": "TZ=${TZ:-Africa/Johannesburg} tsx scripts/send-reminders.ts",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
