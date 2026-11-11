@@ -26,8 +26,10 @@ export async function sendEventReminders() {
       .map((r) => r.user)
       .filter((u) => u.status === "APPROVED");
 
+    // Awaited so a one-shot cron run (scripts/send-reminders.ts) doesn't exit
+    // before the emails are out. sendEmail never throws.
     for (const user of recipients) {
-      void sendEmail(
+      await sendEmail(
         user.email,
         `Reminder: ${event.title} starts soon`,
         `<p>Hey ${user.displayName || user.username}, this is a reminder that
